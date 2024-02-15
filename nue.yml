@@ -1,0 +1,15 @@
+name: nue
+channels:
+  - conda-forge
+
+dependencies:
+  - matplotlib
+  - numpy
+  - python
+  - scikit-learn
+  - scipy
+  - uproot
+  - hist
+  - jupyterlab
+  - mplhep
+  - lhcbstyle
