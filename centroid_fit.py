@@ -54,6 +54,34 @@ def fitCentroid(file, plate):
 
     return fitMeanX, fitMeanY, fitMeanErrX, fitMeanErrY, fitVarX, fitVarY, integralX, integralY
 
+def fitCentroid2D(file, plate):
+    _binMaxX=c_int(0)
+    _binMaxY=c_int(0)
+    _binMaxZ=c_int(0)
+    file[f'h_{plate}'].GetXaxis().SetRangeUser(11500+plate*10,13500+plate*10)
+    file[f'h_{plate}'].GetYaxis().SetRangeUser(104000+plate*10,106000+plate*10)
+    file[f'h_{plate}'].GetMaximumBin(_binMaxX, _binMaxY, _binMaxZ)
+    binMaxX=_binMaxX.value
+    binMaxY=_binMaxY.value
+    maxValueX = file[f'h_{plate}'].GetXaxis().GetBinCenter(binMaxX)
+    maxValueY = file[f'h_{plate}'].GetYaxis().GetBinCenter(binMaxY)
+    f2gaus = ROOT.TF2('gaus2', 'xygaus(0)+pol0(5)')
+    f2gaus.SetParameter(1, maxValueX)
+    f2gaus.SetParameter(2, 250)
+    f2gaus.SetParameter(3, maxValueY)
+    f2gaus.SetParameter(4, 250)
+    f2gaus.SetParameter(5, 10)
+    fitXY = file[f'h_{plate}'].Fit("gaus2","SQ")
+    integralXY = f2gaus.Integral(maxValueX-500,maxValueX+500,maxValueY-500,maxValueY+500)
+    fitMeanX = fitXY.Parameter(1)
+    fitMeanErrX = fitXY.ParError(1)
+    fitVarX = fitXY.Parameter(2)
+    fitMeanY = fitXY.Parameter(3)
+    fitMeanErrY = fitXY.ParError(3)
+    fitVarY = fitXY.Parameter(4)
+
+    return fitMeanX, fitMeanY, fitMeanErrX, fitMeanErrY, fitVarX, fitVarY, integralXY
+
 
 couplesFile = '/afs/cern.ch/work/f/falicant/public/nue_search/hist_couples_aligned_mos.root'
 couples = loadHists(couplesFile)
@@ -81,15 +109,23 @@ meanErrY = []
 varX = []
 varY = []
 
+fit2D = True
+
 for plate in range(18, 52):
-    fitMeanX, fitMeanY, fitMeanErrX, fitMeanErrY, fitVarX, fitVarY, integralX, integralY = fitCentroid(couples, plate)
+    if fit2D:
+        fitMeanX, fitMeanY, fitMeanErrX, fitMeanErrY, fitVarX, fitVarY, integralXY = fitCentroid2D(couples, plate)
+    else:
+        fitMeanX, fitMeanY, fitMeanErrX, fitMeanErrY, fitVarX, fitVarY, integralX, integralY = fitCentroid(couples, plate)
     meanX.append(fitMeanX)
     meanY.append(fitMeanY)
     meanErrX.append(fitMeanErrX)
     meanErrY.append(fitMeanErrY)
     varX.append(fitVarX)
     varY.append(fitVarY)
-    print(f'Centroid fit for plate {plate}: x {int(fitMeanX)} #pm {int(fitVarX)}, y {int(fitMeanY)} #pm {int(fitVarY)}, total width {int(integralX+integralY)}')
+    if fit2D:
+        print(f'Centroid fit for plate {plate}: x {int(fitMeanX)} #pm {int(fitVarX)}, y {int(fitMeanY)} #pm {int(fitVarY)}, total width {int(integralXY)}')
+    else:
+        print(f'Centroid fit for plate {plate}: x {int(fitMeanX)} #pm {int(fitVarX)}, y {int(fitMeanY)} #pm {int(fitVarY)}, total width {int(integralX+integralY)}')
 
 arrZ = array('d', zList)
 arrX = array('d', meanX)
