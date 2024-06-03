@@ -93,8 +93,6 @@ void getEntriesInEllipse(TH2F &h2, TEllipse &el, float bkg, int *signif_bins, in
   }
 }
 
-
-
 void count_bins(TH2F &h2, TObjArray &peaks, float bkg) {
   int np = peaks.GetEntries();
   int signif_bins;
@@ -107,6 +105,20 @@ void count_bins(TH2F &h2, TObjArray &peaks, float bkg) {
   }
 }
 
+void count_bins(TH2F &h2, TObjArray &peaks, float bkg, int plate, TH1F *h_prof[5], TH1F *h_signif[5]) {
+  int np = peaks.GetEntries();
+  int signif_bins;
+  int entries;
+
+  for(int j=0; j<np; j++) {
+    TEllipse *el = ((TEllipse*)(peaks.At(j)));
+    getEntriesInEllipse(h2, *el, bkg, &signif_bins, &entries);
+    h_prof[j]->SetBinContent(plate, entries);
+    h_signif[j]->SetBinContent(plate, signif_bins);
+    printf("Peak %i has %i significant bins and %i entries\n", j+1, signif_bins, entries);
+  }
+}
+
 void drawXYP() {
   TH2F *h2 = (TH2F *)(gDirectory->Get("XYseg"));
   TH3F *h3 = (TH3F *)(gDirectory->Get("XYPseg"));
@@ -115,7 +127,7 @@ void drawXYP() {
   set_limits(*h3,*h2);
   TCanvas *c = new TCanvas("c", "c", 800, 800);
   c->SetGrid();
-  gStyle->SetOptStat("n");
+  gStyle->SetOptStat(0);
   h2->Draw("colz");
   c->Update();
   c->Print("sh.gif+180");
@@ -127,11 +139,17 @@ void drawXYP() {
   c->Update();
   c->Print("sh.gif+180");
   count_bins(*h2, peaks, bkg);
-
-  for(int i=1; i<=3; i++) { //change nplates for mc
+  
+  int npmax = peaks.GetEntries();
+  TH1F *h_prof[npmax], *h_signif[npmax];
+  for(int j=0; j<npmax; j++) {
+    h_prof[j] = new TH1F(Form("h_prof_%i", j+1),"Profile entries;plate", 60, 1, 61);
+    h_signif[j] = new TH1F(Form("h_signif%i", j+1),"Profile significant bins;plate", 60, 1, 61);
+  }
+  for(int i=1; i<=60; i++) { //change nplates for mc
     h3->GetZaxis()->SetRange(i,i);
     TH2F *h = (TH2F*)(h3->Project3D("yx"));
-    h->SetTitle(Form("plate %d",i));
+    h->SetTitle(Form("Plate %d",i));
     h->Smooth();
     //h->Rebin2D(3,3);
     float bkg_p = eval_bkg(*h);
@@ -144,10 +162,22 @@ void drawXYP() {
     get_peaks(*h,locpeaks,loctxt,10);
     drawEllipse(locpeaks,loctxt, kWhite);
 
-    count_bins(*h, peaks, bkg_p);
+    count_bins(*h, peaks, bkg_p, i, &h_prof[0], &h_signif[0]);
     c->Update();
     c->Print("sh.gif+12");
   }
   c->Print("sh.gif++");
+  TCanvas *c2 = new TCanvas("c2", "c2", 1000, 1800);
+  TCanvas *c3 = new TCanvas("c3", "c3", 1000, 1800);
+  c2->Divide(1,5);
+  c3->Divide(1,5);
+  for(int j=0; j<peaks.GetEntries(); j++) {
+    c2->cd(j+1);
+    h_prof[j]->Draw();
+    c3->cd(j+1);
+    h_signif[j]->Draw();
+  }
+  c2->Draw();
+  c3->Draw();
 }
 
