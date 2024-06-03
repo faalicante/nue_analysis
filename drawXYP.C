@@ -1,5 +1,4 @@
-float set_range(TH3F &h3, TH2F &h2, float thr)
-{
+float set_range(TH3F &h3, TH2F &h2, float thr){
   int xmi = h2.FindFirstBinAbove(thr,1);
   int xma = h2.FindLastBinAbove(thr,1);
   int ymi = h2.FindFirstBinAbove(thr,2);
@@ -11,15 +10,15 @@ float set_range(TH3F &h3, TH2F &h2, float thr)
   return h2.Integral()/(xma-xmi+1)/(yma-ymi+1);
 }
 
-void set_limits(TH3F &h3, TH2F &h2)
-{
+float set_limits(TH3F &h3, TH2F &h2){
   float meanbin = h2.Integral()/h2.GetNbinsX()/h2.GetNbinsY();
   float newmean = set_range(h3, h2, meanbin/2);
-  printf("meanbin = %f    newmean = %f   lastmean = %f\n",meanbin, newmean, set_range(h3, h2, newmean/2));
+  float lastmean = set_range(h3, h2, newmean/2);
+  printf("meanbin = %f    newmean = %f   lastmean = %f\n",meanbin, newmean, lastmean);
+  return(lastmean)
 }
 
-void getMax(TH2F &h2, TObjArray &a, TObjArray &txt)
-{
+void getMax(TH2F &h2, TObjArray &a, TObjArray &txt){
    Int_t MaxBin = h2.GetMaximumBin();
    Int_t ix,iy,iz;
    h2.GetBinXYZ(MaxBin, ix, iy, iz);
@@ -31,21 +30,19 @@ void getMax(TH2F &h2, TObjArray &a, TObjArray &txt)
    TText  *t = new TText(x,y+300,Form("%d",a.GetEntries()));
    //t->SetTextSize(0.8);
    txt.Add(t);
-   printf("%f %f \n",x,y);
+   //printf("%f %f \n",x,y);
    int r0=4;
    for(int iix = ix-r0; iix<=ix+r0; iix++)
      for(int iiy = iy-r0; iiy<=iy+r0; iiy++)
        h2.SetBinContent(iix,iiy,0);
 }
 
-void get_peaks(TH2F &h2, TObjArray &a, TObjArray &txt, int npmax)
-{
+void get_peaks(TH2F &h2, TObjArray &peaks, TObjArray &txt, int npmax){
   TH2F *h2new = (TH2F*)h2.Clone("get_peaks");
-  for(int i=0; i<npmax; i++) getMax(*h2new, a, txt);
+  for(int i=0; i<npmax; i++) getMax(*h2new, peaks, txt);
 }
 
-void drawEllipse( TObjArray &peaks, TObjArray &txt, int col )
-{
+void drawEllipse(TObjArray &peaks, TObjArray &txt, int col){
   int np = peaks.GetEntries();
   TText t(0,0,"a");
   for(int j=0; j<np; j++) {
@@ -56,13 +53,12 @@ void drawEllipse( TObjArray &peaks, TObjArray &txt, int col )
   }
 }
 
-void drawXYP()
-{
+void drawXYP(){
   TH2F *h2 = (TH2F *)(gDirectory->Get("XYseg"));
   TH3F *h3 = (TH3F *)(gDirectory->Get("XYPseg"));
   h2->Smooth();
-  set_limits(*h3,*h2);
-  TCanvas *c = new TCanvas();
+  float bkg = set_limits(*h3,*h2);
+  TCanvas *c = new TCanvas("c", "c", 800, 800);
   c->SetGrid();
   gStyle->SetOptStat("n");
   h2->Draw("colz");
@@ -76,7 +72,7 @@ void drawXYP()
   c->Update();
   c->Print("sh.gif+180");
 
-  for(int i=1; i<=57; i++) {
+  for(int i=1; i<=60; i++) { //change nplates for mc
     h3->GetZaxis()->SetRange(i,i);
     TH2F *h = (TH2F*)(h3->Project3D("yx"));
     h->SetTitle(Form("plate %d",i));
@@ -92,8 +88,6 @@ void drawXYP()
     c->Update();
     c->Print("sh.gif+12");
   }
-  
   c->Print("sh.gif++");
-  
 }
 
