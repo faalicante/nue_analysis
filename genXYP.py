@@ -5,7 +5,7 @@ parser = ArgumentParser()
 parser.add_argument("--cell", dest="cellID", required=False, default=None, type=int)
 options = parser.parse_args()
 
-brick = 21
+brick = 23
 nx = 18
 ny = nx
 xmin = 5000.
@@ -22,8 +22,8 @@ xmaxcell = emulsioncell.X(ix-1)+emulsioncell.Xbin()
 ymincell = emulsioncell.Y(iy-1)-emulsioncell.Ybin()
 ymaxcell = emulsioncell.Y(iy-1)+emulsioncell.Ybin()
 bin_size = 50
-xbin = int(3*(xmaxcell-xmincell)/bin_size)
-ybin = int(3*(ymaxcell-ymincell)/bin_size)
+xbin = int((xmaxcell-xmincell)/bin_size)
+ybin = int((ymaxcell-ymincell)/bin_size)
 overlap_fraction = 0.25
 
 rootfile = ROOT.TFile(f"hist_XYP_{ix}_{iy}.root","RECREATE")
@@ -33,10 +33,10 @@ hTXTY = ROOT.TH2F("TXTYseg", "TXTYseg", 200, -0.1, 0.1, 200, -0.1, 0.1)
 
 path = f"/eos/experiment/sndlhc/emulsionData/2022/emureco_Napoli/RUN1/b{brick:06}"
 #scanset
-sspath = path                   ##CREATE FOLDERS
+sspath = path+f"/trackfiles/57_1/cell_{ix}_{iy}"                   ##CREATE FOLDERS
 sproc = ROOT.EdbScanProc()
 sproc.eProcDirClient=sspath
-id = ROOT.EdbID(brick,0,0,0)
+id = ROOT.EdbID(brick,0,ix,iy)
 ss = sproc.ReadScanSet(id)
 ss.Brick().SetID(brick)
 
@@ -72,7 +72,11 @@ for i in range(npl):
     seg.SetZ(plate.Z())
     seg.SetPID(i)
     seg.Transform(plate.GetAffineXY())
-    seg.Transform(plate.GetAffineTXYY())
+    afftxty = plate.GetAffineTXTY()
+    tx = afftxty.A11()*seg.TX() + afftxty.A12()*seg.TY() + afftxty.B1()
+    ty = afftxty.A21()*seg.TX() + afftxty.A22()*seg.TY() + afftxty.B2()
+    seg.SetTX(tx)
+    seg.SetTY(ty)
     hXY.Fill(seg.X(), seg.Y())
     hXYP.Fill(seg.X(), seg.Y(),nplate)
     hTXTY.Fill(seg.TX(), seg.TY())
