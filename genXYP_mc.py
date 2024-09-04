@@ -1,14 +1,14 @@
 import ROOT
 import fedrarootlogon
 
-brick = 21
+brick = 51
 xmin = 289000 - 5000
 xmax = 299000 + 5000
 ymin = 84000 - 5000
 ymax = 94000 + 5000
 bin_size = 50
-xbin = int(3*(xmax-xmin)/bin_size)
-ybin = int(3*(ymax-ymin)/bin_size)
+xbin = int((xmax-xmin)/bin_size)
+ybin = int((ymax-ymin)/bin_size)
 
 rootfile = ROOT.TFile(f"hist_XYP_muon.root","RECREATE")
 hXY = ROOT.TH2D(f"XYseg",f"XYseg;x[#mum];y[#mum]", xbin, xmin, xmax, ybin, ymin, ymax)

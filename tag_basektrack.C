@@ -18,7 +18,7 @@ float set_limits(TH3F &h3, TH2F &h2) {
   return lastmean;
 }
 
-void eval_bkg(TH2F &h2, TEllipse &el, float *bkg) { //make it two control regions next to the circle
+void eval_bkg(TH2F &h2, TEllipse &el, float *bkg) { //two control regions next to the circle
   float x0 = el.GetX1();
   float y0 = el.GetY1();
   float r1 = el.GetR1();
@@ -52,10 +52,30 @@ void eval_bkg(TH2F &h2, TEllipse &el, float *bkg) { //make it two control region
   // printf("Average background %f\n", *bkg);
 }
 
+void eval_bkg(TH2F &h2, float *bkg) { //just one clear area
+  float x1 = 292000; //b11 293000 //b21 292000 //b31 292000 //b41 292000 //b51 294000
+  float y1 = 92000;  //b11 88000  //b21 91500  //b31 88000  //b41 92000  //b51 90000
+  float r1 = 500;
+
+  int xmi1 = (int)(x1-r1);
+  int xma1 = (int)(x1+r1);
+  int ymi1 = (int)(y1-r1);
+  int yma1 = (int)(y1+r1);
+
+  int xmax1 = h2.GetXaxis()->FindBin(xma1);
+  int xmin1 = h2.GetXaxis()->FindBin(xmi1);
+  int ymax1 = h2.GetYaxis()->FindBin(yma1);
+  int ymin1 = h2.GetYaxis()->FindBin(ymi1);
+
+  float bkg1 = h2.Integral(xmin1,xmax1,ymin1,ymax1)/(xmax1-xmin1+1)/(ymax1-ymin1+1);
+  *bkg = bkg1;
+  // printf("Average background %f\n", *bkg);
+}
+
 void getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt) {
   Int_t MaxBin = h2.GetMaximumBin();
   Int_t ix,iy,iz;
-  int radius = 200;
+  int radius = 250;
   h2.GetBinXYZ(MaxBin, ix, iy, iz);
   float x = ((TAxis*)h2.GetXaxis())->GetBinCenter(ix);
   float y = ((TAxis*)h2.GetYaxis())->GetBinCenter(iy);
@@ -121,11 +141,11 @@ void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F *h_long[n
   float bkg;
   float entries;
   float width;
-  float bin_size = 50./3;
+  float bin_size = 50;
 
   for(int i=0; i<np; i++) {
     TEllipse *el = ((TEllipse*)(peaks.At(i)));
-    eval_bkg(h2, *el, &bkg);
+    eval_bkg(h2, &bkg);
     getEntriesInEllipse(h2, *el, &signif_bins, &entries, &bkg);
     // printf("Peak %i has %i significant bins and %i entries\n", i+1, signif_bins, (int)entries);
     // entries = entries - bkg;
@@ -135,50 +155,44 @@ void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F *h_long[n
   }
 }
 
-void makePlots(int npmax, TH1F* h_long[npmax]) {
-  TCanvas *c2 = new TCanvas("c2", "c2", 1000, 600);
-  TLegend *leg = new TLegend(0.75, 0.7, 0.87, 0.87);
-  leg->SetTextFont(53);
-  leg->SetBorderSize(0);
-  float max_long = 0;
-
-  for(int i=0; i<npmax; i++) {
-    leg->AddEntry(h_long[i], Form("Peak %i",i), "L2");
-    h_long[i]->SetLineColor(i+1);
-    h_long[i]->SetLineWidth(2);
-    h_long[i]->Scale(1./h_long[i]->Integral());
-    if (h_long[i]->GetMaximum() > max_long) {
-      max_long = h_long[i]->GetMaximum();
-      h_long[0]->GetYaxis()->SetRangeUser(0, max_long*1.2);
-    }
-    h_long[i]->Draw("same&&hist");
-    c2->Update();
-
-  }
-  c2->Print("longitudinal_xz.png");
+void makePlots(TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPeak, int *maxPlate) {
+  int idx = (np%3) +1;
+  if (idx==1) c->Clear("D");
+  c->cd(idx)->SetGrid(1,0);
+  *maxPeak = h_long->GetMaximum(),
+  *maxPlate = h_long->GetMaximumBin();
+  h_long->SetLineColor(1);
+  h_long->SetLineWidth(2);
+  h_long->Draw("hist");
+  if(np == 2)                 c->Print("longitudinal_xz.pdf(","pdf");
+  else if(np == npmax-1)      c->Print("longitudinal_xz.pdf)","pdf");
+  else if(idx == 3 && np >2 ) c->Print("longitudinal_xz.pdf","pdf");
 }
 
-void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) {
- *firstPlate = h_long->FindFirstBinAbove(0.005);
- *lastPlate = h_long->FindLastBinAbove(0.01);
+void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axis?
+  h_long->Scale(1./h_long->Integral());
+  *firstPlate = h_long->FindFirstBinAbove(0.01);
+  *lastPlate = h_long->FindLastBinAbove(0.01);
 }
 
 void makeNtuple(int np, TH1F *h_long[np], TObjArray &peaks) {
   TFile *output = new TFile("peaks.root","RECREATE");
-  TNtuple *ntuple = new TNtuple("showers","tagged showers","x:y:start:end");
-  int signif_bins;
+  TNtuple *ntuple = new TNtuple("showers","tagged showers","x:y:start:end:peak:maxplate");
+  TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
+  c2->Divide(1,3);
   
   float entries;
   float width;
   float bin_size = 50;
-  int firstPlate, lastPlate;
+  int firstPlate, lastPlate, maxPeak, maxPlate;
 
   for(int i=0; i<np; i++) {
     TEllipse *el = ((TEllipse*)(peaks.At(i)));
     float x = el->GetX1();
     float y = el->GetY1();
+    makePlots(c2, i, np, h_long[i], &maxPeak, &maxPlate);
     findStart(h_long[i], &firstPlate, &lastPlate);
-    ntuple->Fill(x, y, firstPlate, lastPlate);
+    ntuple->Fill(x, y, firstPlate, lastPlate, maxPeak, maxPlate);
   }
 
   output->Write();
@@ -186,7 +200,7 @@ void makeNtuple(int np, TH1F *h_long[np], TObjArray &peaks) {
 }
 
 void tag_basektrack() {
-  int ntag = 5;
+  int ntag = 50;
   TH2F *h2 = (TH2F *)(gDirectory->Get("XYseg"));
   TH3F *h3 = (TH3F *)(gDirectory->Get("XYPseg"));
   h2->Smooth();
@@ -207,7 +221,7 @@ void tag_basektrack() {
   
   TH1F *h_long[ntag];
   for(int i=0; i<ntag; i++) {
-    h_long[i] = new TH1F(Form("h_long_%i", i+1),"Longitudinal entries;plate", 60, 1, 61);
+    h_long[i] = new TH1F(Form("h_long_%i", i+1),Form("Cluster %i;plate;%%segments", i+1), 60, 1, 61);
   }
 
   const int nplates = 60; //change nplates for mc
@@ -224,6 +238,6 @@ void tag_basektrack() {
   }
   c->Print("sh.gif++");
 
-  makePlots(ntag, &h_long[0]);
+  // makePlots(ntag, &h_long[0]);
   makeNtuple(ntag, &h_long[0], peaks);
 }
