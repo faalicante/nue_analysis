@@ -1,3 +1,7 @@
 *.png
 *.pdf
 *.root
+condor/log
+condor/error
+condor/output
+falicant.cc

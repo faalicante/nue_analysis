@@ -26,16 +26,20 @@ def spherocity(vecs, initial_angle = 0.):
     return np.pi**2/4.*(num/denom)**2, direction
 
 vecs = {}
-def append_list_to_dict(key, values_list):
+def append_list_to_vecs(key, values_list):
     if key in vecs:
         vecs[key].append(values_list)
     else:
         vecs[key] = [values_list]
 
-xmin = 0
-xmax = 400000
-ymin = 0
-ymax = 400000
+# xmin = 0
+# xmax = 400000
+# ymin = 0
+# ymax = 400000
+xmin = 289000
+xmax = 299000
+ymin = 84000
+ymax = 94000
 bin_size = 50
 xbin = int((xmax-xmin)/bin_size)
 ybin = int((ymax-ymin)/bin_size)
@@ -47,11 +51,11 @@ ntuple = ROOT.TNtuple("couples", "Tree of couples","p:x:y:tx:ty:theta:sph")
 
 shower_file = ROOT.TFile.Open(prepath+"/nue_showers.root")
 cbmsim = shower_file.cbmsim
-shower_list = []
+shower_list = {}
 h = {}
 for event in cbmsim:
-  if event.count < 2000: continue
-  shower_list.append(event.event)  
+  if event.nHits < 5000: continue
+  shower_list[event.event] = event.brick 
   #h[f'xy_{event.event}'] = ROOT.TH2D(f'xy_{event.event}', f'xy_{event.event}; x [#mum]; y [#mum]', xbin, xmin, xmax, ybin, ymin, ymax)
   h[f'theta_{event.event}'] = ROOT.TH2D(f'theta_{event.event}', f'theta_{event.event}; plate; theta [#mrad]', 60, 1, 61, 3140, 0, pi*100)
 #h['xy'] = ROOT.TH2D('xy', 'xy; x [#mum]; y [#mum]', xbin, xmin, xmax, ybin, ymin, ymax)
@@ -83,18 +87,18 @@ for plate in range(1,61):
     seg=ect.eS
     event = seg.MCEvt()
     if event not in shower_list: continue
+    if shower_list[event] != brick: continue
     sx = seg.X()
     sy = seg.Y()
     stx = seg.TX()
     sty = seg.TY()
-    append_list_to_dict(event, [stx, sty])
+    append_list_to_vecs(event, [stx, sty])
     # vecs[event].append([stx, sty])
     stheta =seg.Theta()*100
     ntuple.Fill(plate, sx, sy, stx, sty , stheta)
     #h[f'xy_{event}'].Fill(sx,sy)
     h[f'theta_{event}'].Fill(plate, stheta)
 
-print(len(vecs), "event in this brick out of", len(shower_list))
 ect.Close()
 rootfile.cd()
 for event in vecs.keys():
@@ -115,5 +119,4 @@ h['spherocity'].Write()
 h['direction'].Write()
 ntuple.Write()
 rootfile.Close()
-
-##issue: same event in multiple bricks
+print(len(vecs), "event in this brick out of", len(shower_list))

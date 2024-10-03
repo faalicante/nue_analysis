@@ -1,0 +1,13 @@
+executable = condor_tag_mc.sh
+arguments = $(ClusterID) $(ProcId) $(BRICK)
+output = output/tag.$(ClusterId).$(BRICK).out
+error = error/tag.$(ClusterId).$(BRICK).err
+log = log/tag.$(ClusterId).log
++JobFlavour = "workday"
+request_memory = 8GB
+notification = Never
+requirements = (OpSysAndVer =?= "AlmaLinux9")
+requirements = Machine =!= LastRemoteHost
+on_exit_remove          = (ExitBySignal == False) && ((ExitCode == 1) || (ExitCode == 0))
+max_retries             = 3
+queue BRICK in 11, 12, 13, 14, 21, 22, 23, 24, 31, 32, 33, 34, 41, 42, 43, 44, 51, 52, 53, 54

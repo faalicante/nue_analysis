@@ -10,12 +10,11 @@ float set_range(TH3F &h3, TH2F &h2, float thr) {
   return h2.Integral()/(xma-xmi+1)/(yma-ymi+1);
 }
 
-float set_limits(TH3F &h3, TH2F &h2) {
+void set_limits(TH3F &h, TH2F &h2) {
   float meanbin = h2.Integral()/h2.GetNbinsX()/h2.GetNbinsY();
-  float newmean = set_range(h3, h2, meanbin/2);
-  float lastmean = set_range(h3, h2, newmean/2);
-  printf("meanbin = %f    newmean = %f   lastmean = %f\n",meanbin, newmean, lastmean);
-  return lastmean;
+  float newmean = set_range(h, h2, meanbin/2);
+  float lastmean = set_range(h, h2, newmean/2);
+  // printf("meanbin = %f    newmean = %f   lastmean = %f\n",meanbin, newmean, lastmean);
 }
 
 void eval_bkg(TH2F &h2, TEllipse &el, float *bkg) { //two control regions next to the circle
@@ -53,8 +52,8 @@ void eval_bkg(TH2F &h2, TEllipse &el, float *bkg) { //two control regions next t
 }
 
 void eval_bkg(TH2F &h2, float *bkg) { //just one clear area
-  float x1 = 292000; //b11 293000 //b21 292000 //b31 292000 //b41 292000 //b51 294000
-  float y1 = 92000;  //b11 88000  //b21 91500  //b31 88000  //b41 92000  //b51 90000
+  float x1 = 294000; //b11 293000 //b21 292000 //b31 292000 //b41 292000 //b51 294000
+  float y1 = 90000;  //b11 88000  //b21 91500  //b31 88000  //b41 92000  //b51 90000
   float r1 = 500;
 
   int xmi1 = (int)(x1-r1);
@@ -72,10 +71,11 @@ void eval_bkg(TH2F &h2, float *bkg) { //just one clear area
   // printf("Average background %f\n", *bkg);
 }
 
-void getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt) {
+int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt) {
   Int_t MaxBin = h2.GetMaximumBin();
+  int rankbin = h2.GetMaximum();
   Int_t ix,iy,iz;
-  int radius = 250;
+  int radius = 300;
   h2.GetBinXYZ(MaxBin, ix, iy, iz);
   float x = ((TAxis*)h2.GetXaxis())->GetBinCenter(ix);
   float y = ((TAxis*)h2.GetYaxis())->GetBinCenter(iy);
@@ -83,17 +83,21 @@ void getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt) {
   el->SetFillStyle(0);
   peaks.Add(el);
   TText  *t = new TText(x,y+300,Form("%d",peaks.GetEntries()));
-  //t->SetTextSize(0.8);
+  t->SetTextSize(0.03);
   txt.Add(t);
-  int r0=4;
-  for(int iix = ix-r0; iix<=ix+r0; iix++)
+  int r0=10;
+  for(int iix = ix-r0; iix<=ix+r0; iix++) //to fix remove the circle not square
     for(int iiy = iy-r0; iiy<=iy+r0; iiy++)
       h2.SetBinContent(iix,iiy,0);
+  return rankbin;
 }
 
-void get_peaks(TH2F &h2, TObjArray &peaks, TObjArray &txt, int npmax) {
+void get_peaks(TH2F &h2, TObjArray &peaks, TObjArray &txt, int npmax, int ranks[npmax]) {
   TH2F *h2new = (TH2F*)h2.Clone("get_peaks");
-  for(int i=0; i<npmax; i++) getMax(*h2new, peaks, txt);
+  for(int i=0; i<npmax; i++){
+    int rankbin = getMax(*h2new, peaks, txt);
+    ranks[i] = rankbin;
+  }
 }
 
 void drawEllipse(TObjArray &peaks, TObjArray &txt, int col) {
@@ -138,7 +142,7 @@ void getEntriesInEllipse(TH2F &h2, TEllipse &el, int *signif_bins, float *entrie
 void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F *h_long[npmax]) {
   int np = peaks.GetEntries();
   int signif_bins;
-  float bkg;
+  float bkg = 0;
   float entries;
   float width;
   float bin_size = 50;
@@ -146,16 +150,18 @@ void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F *h_long[n
   for(int i=0; i<np; i++) {
     TEllipse *el = ((TEllipse*)(peaks.At(i)));
     eval_bkg(h2, &bkg);
+    // eval_bkg(h2, *el, &bkg);
     getEntriesInEllipse(h2, *el, &signif_bins, &entries, &bkg);
+    // printf("Peak %i entries %f\n", i, entries);
     // printf("Peak %i has %i significant bins and %i entries\n", i+1, signif_bins, (int)entries);
-    // entries = entries - bkg;
     if (entries<0) entries = 0;
     h_long[i]->SetBinContent(plate, entries);
     width = TMath::Sqrt(signif_bins * bin_size * bin_size / TMath::Pi());
   }
 }
 
-void makePlots(TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPeak, int *maxPlate) {
+void makePlots(int brick, TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPeak, int *maxPlate) {
+  TString path = Form("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b0000%i",brick);
   int idx = (np%3) +1;
   if (idx==1) c->Clear("D");
   c->cd(idx)->SetGrid(1,0);
@@ -164,20 +170,22 @@ void makePlots(TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPeak, int *m
   h_long->SetLineColor(1);
   h_long->SetLineWidth(2);
   h_long->Draw("hist");
-  if(np == 2)                 c->Print("longitudinal_xz.pdf(","pdf");
-  else if(np == npmax-1)      c->Print("longitudinal_xz.pdf)","pdf");
-  else if(idx == 3 && np >2 ) c->Print("longitudinal_xz.pdf","pdf");
+  if(np == 2)                 c->Print(path+"/longitudinal_xz_rebin2.pdf(","pdf");
+  else if(np == npmax-1)      c->Print(path+"/longitudinal_xz_rebin2.pdf)","pdf");
+  else if(idx == 3 && np >2 ) c->Print(path+"/longitudinal_xz_rebin2.pdf","pdf");
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axis?
-  h_long->Scale(1./h_long->Integral());
-  *firstPlate = h_long->FindFirstBinAbove(0.01);
-  *lastPlate = h_long->FindLastBinAbove(0.01);
+  // h_long->Scale(1./h_long->Integral());
+  float entries = h_long->Integral();
+  *firstPlate = h_long->FindFirstBinAbove(0.01 * entries);
+  *lastPlate = h_long->FindLastBinAbove(0.01 * entries);
 }
 
-void makeNtuple(int np, TH1F *h_long[np], TObjArray &peaks) {
-  TFile *output = new TFile("peaks.root","RECREATE");
-  TNtuple *ntuple = new TNtuple("showers","tagged showers","x:y:start:end:peak:maxplate");
+void makeNtuple(int brick, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[np]) {
+  TString path = Form("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b0000%i",brick);
+  TFile *output = new TFile(path+"/peaks_rebin2.root","RECREATE");
+  TNtuple *ntuple = new TNtuple("showers","tagged showers","x:y:start:end:peak:maxplate:nseg:rankbin");
   TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
   c2->Divide(1,3);
   
@@ -190,34 +198,40 @@ void makeNtuple(int np, TH1F *h_long[np], TObjArray &peaks) {
     TEllipse *el = ((TEllipse*)(peaks.At(i)));
     float x = el->GetX1();
     float y = el->GetY1();
-    makePlots(c2, i, np, h_long[i], &maxPeak, &maxPlate);
     findStart(h_long[i], &firstPlate, &lastPlate);
-    ntuple->Fill(x, y, firstPlate, lastPlate, maxPeak, maxPlate);
+    makePlots(brick, c2, i, np, h_long[i], &maxPeak, &maxPlate);
+    int nseg = h_long[i]->Integral(firstPlate, lastPlate);
+    ntuple->Fill(x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, ranks[i]);
   }
 
   output->Write();
   output->Close();
 }
 
-void tag_basektrack() {
+void tag_basetrack_muon(int brick) {
+  TString path = Form("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b0000%i",brick);
   int ntag = 50;
   TH2F *h2 = (TH2F *)(gDirectory->Get("XYseg"));
   TH3F *h3 = (TH3F *)(gDirectory->Get("XYPseg"));
+  h2->Rebin2D(2,2);
   h2->Smooth();
-  float bkg = set_limits(*h3,*h2);
+  // set_limits(*h2, *h2);
+  set_limits(*h3, *h2);
   TCanvas *c = new TCanvas("c", "c", 800, 800);
   c->SetGrid();
   gStyle->SetOptStat(0);
   h2->Draw("colz");
   c->Update();
-  c->Print("sh.gif+180");
+  c->Print(path+"/sh_rebin2.gif+180");
   
   TObjArray peaks;
   TObjArray txt;
-  get_peaks(*h2,peaks,txt,ntag);
+  int ranks[ntag];
+  get_peaks(*h2,peaks,txt,ntag,ranks);
   drawEllipse(peaks,txt, kBlack);
   c->Update();
-  c->Print("sh.gif+180");
+  c->Print(path+"/sh_rebin2.gif+180");
+
   
   TH1F *h_long[ntag];
   for(int i=0; i<ntag; i++) {
@@ -226,18 +240,22 @@ void tag_basektrack() {
 
   const int nplates = 60; //change nplates for mc
   for(int p=1; p<=nplates; p++) { 
+    printf("Plate %i\n", p);
     h3->GetZaxis()->SetRange(p,p);
     TH2F *h = (TH2F*)(h3->Project3D("yx"));
-    h->SetTitle(Form("Plate %d",p));
+    h->Rebin2D(2,2);
+    // TH2F *h = (TH2F *)(gDirectory->Get(Form("XYseg_%i",p)));
+    h->Smooth();
+    // set_limits(*h, *h2);
+    h->SetTitle(Form("Plate %i",p));
     h->Draw("colz");
 
     drawEllipse(peaks,txt, kBlack);
     count_bins(ntag, *h, peaks, p, &h_long[0]);
     c->Update();
-    c->Print("sh.gif+12");
+    c->Print(path+"/sh_rebin2.gif+12");
   }
-  c->Print("sh.gif++");
+  c->Print(path+"/sh_rebin2.gif++");
 
-  // makePlots(ntag, &h_long[0]);
-  makeNtuple(ntag, &h_long[0], peaks);
+  makeNtuple(brick, ntag, &h_long[0], peaks, ranks);
 }

@@ -1,0 +1,13 @@
+executable = condor_sph.sh
+arguments = $(ClusterID) $(ProcId) $(CELL)
+output = output/sph.$(ClusterId).$(CELL).out
+error = error/sph.$(ClusterId).$(CELL).err
+log = log/sph.$(ClusterId).log
++JobFlavour = "workday"
+request_memory = 8GB
+notification = Never
+requirements = (OpSysAndVer =?= "AlmaLinux9")
+requirements = Machine =!= LastRemoteHost
+on_exit_remove          = (ExitBySignal == False) && ((ExitCode == 1) || (ExitCode == 0))
+max_retries             = 3
+queue CELL from seq 0 323 |

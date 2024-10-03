@@ -1,0 +1,13 @@
+executable = condor_tag.sh
+arguments = $(ClusterID) $(ProcId) $(CELL)
+output = output/tag.$(ClusterId).$(CELL).out
+error = error/tag.$(ClusterId).$(CELL).err
+log = log/tag.$(ClusterId).log
++JobFlavour = "microcentury"
+request_memory = 4GB
+notification = Never
+requirements = (OpSysAndVer =?= "AlmaLinux9")
+requirements = Machine =!= LastRemoteHost
+on_exit_remove          = (ExitBySignal == False) && ((ExitCode == 1) || (ExitCode == 0))
+max_retries             = 3
+queue CELL from seq 0 323 |

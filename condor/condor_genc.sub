@@ -1,0 +1,13 @@
+executable = condor_genc.sh
+arguments = $(ClusterID) $(ProcId) $(CELL)
+output = output/genc.$(ClusterId).$(CELL).out
+error = error/genc.$(ClusterId).$(CELL).err
+log = log/genc.$(ClusterId).log
++JobFlavour = "testmatch"
+request_memory = 4GB
+notification = Never
+requirements = (OpSysAndVer =?= "AlmaLinux9")
+requirements = Machine =!= LastRemoteHost
+on_exit_remove          = (ExitBySignal == False) && ((ExitCode == 1) || (ExitCode == 0))
+max_retries             = 3
+queue CELL from seq 0 323 |
