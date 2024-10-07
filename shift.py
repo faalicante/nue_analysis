@@ -1,7 +1,6 @@
 import ROOT
 import numpy as np
 
-
 def loadHists(histFile, query=None):
     f = ROOT.TFile.Open(histFile)
     histList = {}
@@ -55,17 +54,19 @@ def cropHist(h2, shiftX, shiftY):
     return hCrop
             
 
-# path = '/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/hist_XYP_nue.root'
+# Nue simulation
+# file = '/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/hist_XYP_nue.root'
 file = '/Users/fabioali/cernbox/hist_XYP_nue.root'
 h = loadHists(file)
 
 combination = 0
 hComb = {}
 
-c = ROOT.TCanvas("c", "c", 800, 800)
 for shiftTX in np.arange(-shiftRange, shiftRange+1, shiftStep):
     for shiftTY in np.arange(-shiftRange, shiftRange+1, shiftStep):
         combination += 1
+        # MC nue event in b22: 958, 445, 498, 1269 
+        # if (shiftTX == 20 and shiftTY == -4) or (shiftTX == -26 and shiftTY == -10) or (shiftTX == 14 and shiftTY == 0) or (shiftTX == -4 and shiftTY == -16):
         print('Combination', combination)
         hComb[f'XY_{combination}'] = ROOT.TH2F(f'XY_{combination}', f'XY_{combination}', xBin, xMin, xMax, yBin, yMin, yMax)
         hList = ROOT.TList()
@@ -77,7 +78,7 @@ for shiftTX in np.arange(-shiftRange, shiftRange+1, shiftStep):
             hComb[f'XY_{combination}'].Add(hCrop)
 
 # Saving histos
-outputFile = ROOT.TFile("/Users/fabioali/Desktop/histo_combinations.root","RECREATE")
+outputFile = ROOT.TFile("/Users/fabioali/Desktop/histo_shifts.root","RECREATE")
 for combination in hComb.keys():
     print(combination)
     hComb[combination].Write()
