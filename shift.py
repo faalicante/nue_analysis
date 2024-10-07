@@ -1,6 +1,12 @@
 import ROOT
 import numpy as np
 
+from argparse import ArgumentParser
+parser = ArgumentParser()
+parser.add_argument("-p",dest="partition", type=int, required=True)
+options = parser.parse_args()
+partition = options.partition
+
 def loadHists(histFile, query=None):
     f = ROOT.TFile.Open(histFile)
     histList = {}
@@ -61,10 +67,13 @@ h = loadHists(file)
 
 combination = 0
 hComb = {}
+combStart = partition * 100
+combEnd = combStart + 100
 
 for shiftTX in np.arange(-shiftRange, shiftRange+1, shiftStep):
     for shiftTY in np.arange(-shiftRange, shiftRange+1, shiftStep):
         combination += 1
+        if combination < combStart or combination >= combEnd: continue
         # MC nue event in b22: 958, 445, 498, 1269 
         # if (shiftTX == 20 and shiftTY == -4) or (shiftTX == -26 and shiftTY == -10) or (shiftTX == 14 and shiftTY == 0) or (shiftTX == -4 and shiftTY == -16):
         print('Combination', combination)
@@ -78,7 +87,7 @@ for shiftTX in np.arange(-shiftRange, shiftRange+1, shiftStep):
             hComb[f'XY_{combination}'].Add(hCrop)
 
 # Saving histos
-outputFile = ROOT.TFile("/Users/fabioali/Desktop/histo_shifts.root","RECREATE")
+outputFile = ROOT.TFile(f"/Users/fabioali/Desktop/histo_shifts_{partition}.root","RECREATE")
 for combination in hComb.keys():
     print(combination)
     hComb[combination].Write()
