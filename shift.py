@@ -61,12 +61,13 @@ def cropHist(h2, shiftX, shiftY):
             
 
 # Nue simulation
-# file = '/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/hist_XYP_nue.root'
-file = '/Users/fabioali/cernbox/hist_XYP_nue.root'
+path = '/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022'
+# path = '/Users/fabioali/cernbox'
+file = path + '/hist_XYP_nue.root'
 h = loadHists(file)
 
 combination = 0
-hComb = {}
+# hComb = {}
 combStart = partition * 100
 combEnd = combStart + 100
 
@@ -76,19 +77,16 @@ for shiftTX in np.arange(-shiftRange, shiftRange+1, shiftStep):
         if combination < combStart or combination >= combEnd: continue
         # MC nue event in b22: 958, 445, 498, 1269 
         # if (shiftTX == 20 and shiftTY == -4) or (shiftTX == -26 and shiftTY == -10) or (shiftTX == 14 and shiftTY == 0) or (shiftTX == -4 and shiftTY == -16):
+        outputFile = ROOT.TFile(path + f'/histo_shifts_{combination}.root',"RECREATE")
         print('Combination', combination)
-        hComb[f'XY_{combination}'] = ROOT.TH2F(f'XY_{combination}', f'XY_{combination}', xBin, xMin, xMax, yBin, yMin, yMax)
+        hComb = ROOT.TH2F('XYseg', 'XYseg', xBin, xMin, xMax, yBin, yMin, yMax)
         hList = ROOT.TList()
         for layer in range(60):
             plate = layer + 1
             shiftX = shiftTX / 1000 * stepZ * layer
             shiftY = shiftTY / 1000 * stepZ * layer
             hCrop = cropHist(h[f'XYseg_{plate}'], shiftX, shiftY)
-            hComb[f'XY_{combination}'].Add(hCrop)
-
-# Saving histos
-outputFile = ROOT.TFile(f"/Users/fabioali/Desktop/histo_shifts_{partition}.root","RECREATE")
-for combination in hComb.keys():
-    print(combination)
-    hComb[combination].Write()
-outputFile.Close()
+            hCrop.Write()
+            hComb.Add(hCrop)
+        hComb.Write()
+        outputFile.Close()
