@@ -77,7 +77,9 @@ for shiftTX in np.arange(-shiftRange, shiftRange+1, shiftStep):
         if combination < combStart or combination >= combEnd: continue
         # MC nue event in b22: 958, 445, 498, 1269 
         # if (shiftTX == 20 and shiftTY == -4) or (shiftTX == -26 and shiftTY == -10) or (shiftTX == 14 and shiftTY == 0) or (shiftTX == -4 and shiftTY == -16):
+        #For testing
         outputFile = ROOT.TFile(path + f'/histo_shifts_{combination}.root',"RECREATE")
+#        outputFile = ROOT.TFile('/eos/home-m/maclimes/SND/SND_nue_data/simulation/JT_Fabio/testpy.root',"RECREATE")
         print('Combination', combination)
         hComb = ROOT.TH2F('XYseg', 'XYseg', xBin, xMin, xMax, yBin, yMin, yMax)
         hList = ROOT.TList()
