@@ -163,11 +163,7 @@ void tag_basetrack_mc(int comb) {
   for(int p=1; p<=nplates; p++) { 
     printf("Plate %i\n", p);
     TH2F *h = (TH2F *)(gDirectory->Get(Form("XYseg_%i",p)));
-    // h->GetXaxis()->SetRangeUser(320000,360000);
-    // h->GetYaxis()->SetRangeUser(20000,60000);
-    h->%iD(2,2);
     h->Smooth();
-    // set_limits(*h, *h2);
     h->SetTitle(Form("Plate %i",p));
     h->Draw("colz");
 
