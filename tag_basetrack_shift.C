@@ -133,7 +133,7 @@ void makeNtuple(int comb, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[
   output->Close();
 }
 
-void tag_basetrack_mc(int comb) {
+void tag_basetrack_shift(int comb) {
   TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
   int ntag = 50;
   TH2F *h2 = (TH2F *)(gDirectory->Get("XYseg"));
