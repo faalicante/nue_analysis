@@ -87,7 +87,9 @@ void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F *h_long[n
 }
 
 void makePlots(int comb, TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPeak, int *maxPlate) {
-  TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
+  // TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
+  TString path = "/Users/fabioali/cernbox";
+
   int idx = (np%3) +1;
   if (idx==1) c->Clear("D");
   c->cd(idx)->SetGrid(1,0);
@@ -96,9 +98,9 @@ void makePlots(int comb, TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPe
   h_long->SetLineColor(1);
   h_long->SetLineWidth(2);
   h_long->Draw("hist");
-  if(np == 2)                 c->Print(path+Form("/longitudinal_xz_%i.pdf(", comb), "pdf");
-  else if(np == npmax-1)      c->Print(path+Form("/longitudinal_xz_%i.pdf)", comb), "pdf");
-  else if(idx == 3 && np >2 ) c->Print(path+Form("/longitudinal_xz_%i.pdf", comb), "pdf");
+  if(np == 2)                 c->Print(Form(path+"/longitudinal_xz_%i.pdf(", comb), "pdf");
+  else if(np == npmax-1)      c->Print(Form(path+"/longitudinal_xz_%i.pdf)", comb), "pdf");
+  else if(idx == 3 && np >2 ) c->Print(Form(path+"/longitudinal_xz_%i.pdf", comb), "pdf");
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axis?
@@ -108,9 +110,11 @@ void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axi
 }
 
 void makeNtuple(int comb, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[np]) {
-  TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
+  // TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
+  TString path = "/Users/fabioali/cernbox";
+
   TFile *output = new TFile(Form(path+"/peaks_shift_%i.root",comb),"RECREATE");
-  TNtuple *ntuple = new TNtuple("showers","tagged showers","x:y:start:end:peak:maxplate:nseg:rankbin");
+  TNtuple *ntuple = new TNtuple("showers","tagged showers","comb:x:y:start:end:peak:maxplate:nseg:rankbin");
   TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
   c2->Divide(1,3);
   
@@ -126,7 +130,7 @@ void makeNtuple(int comb, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[
     findStart(h_long[i], &firstPlate, &lastPlate);
     makePlots(comb, c2, i, np, h_long[i], &maxPeak, &maxPlate);
     int nseg = h_long[i]->Integral(firstPlate, lastPlate);
-    ntuple->Fill(x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, ranks[i]);
+    ntuple->Fill(comb, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, ranks[i]);
   }
 
   output->Write();
@@ -134,16 +138,18 @@ void makeNtuple(int comb, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[
 }
 
 void tag_basetrack_shift(int comb) {
-  TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
-  int ntag = 50;
+  // TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
+  TString path = "/Users/fabioali/cernbox";
+
+  int ntag = 5;
   TH2F *h2 = (TH2F *)(gDirectory->Get("XYseg"));
-  h2->Smooth();
+  // h2->Smooth();
   TCanvas *c = new TCanvas("c", "c", 800, 800);
   c->SetGrid();
   gStyle->SetOptStat(0);
   h2->Draw("colz");
   c->Update();
-  c->Print(path+Form("/sh_%i.gif+180", comb));
+  c->Print(Form(path+"/sh_%i_nosmooth.gif+180", comb));
   
   TObjArray peaks;
   TObjArray txt;
@@ -151,7 +157,7 @@ void tag_basetrack_shift(int comb) {
   get_peaks(*h2,peaks,txt,ntag,ranks);
   drawEllipse(peaks,txt, kBlack);
   c->Update();
-  c->Print(path+Form("/sh_%i.gif+180", comb));
+  c->Print(Form(path+"/sh_%i_nosmooth.gif+180", comb));
 
   
   TH1F *h_long[ntag];
@@ -162,17 +168,17 @@ void tag_basetrack_shift(int comb) {
   const int nplates = 60; //change nplates for mc
   for(int p=1; p<=nplates; p++) { 
     printf("Plate %i\n", p);
-    TH2F *h = (TH2F *)(gDirectory->Get(Form("XYseg_%i",p)));
-    h->Smooth();
+    TH2F *h = (TH2F *)(gDirectory->Get(Form("XYPseg_%i",p)));
+    // h->Smooth();
     h->SetTitle(Form("Plate %i",p));
     h->Draw("colz");
 
     drawEllipse(peaks,txt, kBlack);
     count_bins(ntag, *h, peaks, p, &h_long[0]);
     c->Update();
-    c->Print(path+Form("/sh_%i.gif+12", comb));
+    c->Print(Form(path+"/sh_%i_nosmooth.gif+12", comb));
   }
-  c->Print(path+Form("/sh_%i.gif++", comb));
+  c->Print(Form(path+"/sh_%i_nosmooth.gif++", comb));
 
   makeNtuple(comb, ntag, &h_long[0], peaks,ranks);
 }
