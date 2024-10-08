@@ -87,7 +87,7 @@ void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F *h_long[n
 }
 
 void makePlots(int comb, TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPeak, int *maxPlate) {
-  TString path = Form("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift",comb);
+  TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
   int idx = (np%3) +1;
   if (idx==1) c->Clear("D");
   c->cd(idx)->SetGrid(1,0);
@@ -96,9 +96,9 @@ void makePlots(int comb, TCanvas *c, int np, int npmax, TH1F* h_long, int *maxPe
   h_long->SetLineColor(1);
   h_long->SetLineWidth(2);
   h_long->Draw("hist");
-  if(np == 2)                 c->Print(path+Form("/longitudinal_xz_%i.pdf("), comb), "pdf");
-  else if(np == npmax-1)      c->Print(path+Form("/longitudinal_xz_%i.pdf)"), comb), "pdf");
-  else if(idx == 3 && np >2 ) c->Print(path+Form("/longitudinal_xz_%i.pdf"), comb), "pdf");
+  if(np == 2)                 c->Print(path+Form("/longitudinal_xz_%i.pdf(", comb), "pdf");
+  else if(np == npmax-1)      c->Print(path+Form("/longitudinal_xz_%i.pdf)", comb), "pdf");
+  else if(idx == 3 && np >2 ) c->Print(path+Form("/longitudinal_xz_%i.pdf", comb), "pdf");
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axis?
@@ -108,8 +108,8 @@ void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axi
 }
 
 void makeNtuple(int comb, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[np]) {
-  TString path = Form("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift",comb);
-  TFile *output = new TFile(Form(path+"/peaks_shift_%i.root"),comb),"RECREATE");
+  TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
+  TFile *output = new TFile(Form(path+"/peaks_shift_%i.root",comb),"RECREATE");
   TNtuple *ntuple = new TNtuple("showers","tagged showers","x:y:start:end:peak:maxplate:nseg:rankbin");
   TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
   c2->Divide(1,3);
@@ -134,7 +134,7 @@ void makeNtuple(int comb, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[
 }
 
 void tag_basetrack_mc(int comb) {
-  TString path = Form("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift",comb);
+  TString path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift";
   int ntag = 50;
   TH2F *h2 = (TH2F *)(gDirectory->Get("XYseg"));
   h2->Smooth();
