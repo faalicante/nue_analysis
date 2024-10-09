@@ -1,6 +1,8 @@
 *.png
 *.pdf
 *.root
+Cshift/*.o
+Cshift/*.exe
 condor/log
 condor/error
 condor/output
