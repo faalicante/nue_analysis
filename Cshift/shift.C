@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
 	    //For testing
 //            TString outputFileName = Form("histo_shifts_%d.root",combination);
 //	    TFile *outputFile = new TFile("/eos/user/m/maclimes/SND/SND_nue_data/simulation/JT_Fabio/test/"+outputFileName,"RECREATE");	
-	    TFile outputFile(outputFileName, "RECREATE");
+	    TFile *outputFile = new TFile(outputFileName, "RECREATE");
             std::cout << "Combination " << combination << std::endl;
 
             TH2F* hComb = new TH2F("XYseg", "XYseg", (82500 - 71500) / 50, 71500, 82500, (96500 - 85500) / 50, 85500, 96500);
