@@ -19,8 +19,7 @@ for entry in showers:
     peak = int(entry.rankbin)
     ix = combination//31 +1
     iy = combination%31 +1 
-    content = hmap.GetBinContent(ix,iy)
-    if peak > content:
+    if showers.tag==1:
         hmap.SetBinContent(ix, iy, peak)
 
 c = ROOT.TCanvas("c","c",800,800)
