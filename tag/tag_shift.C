@@ -8,8 +8,8 @@
 #include "TStyle.h"
 #include <iostream>
 
-const char *path = "/Users/fabioali/cernbox";
-// const char *path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022";
+// const char *path = "/Users/fabioali/cernbox";
+const char *path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022";
 
 int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt) {
   Int_t MaxBin = h2.GetMaximumBin();
@@ -91,7 +91,7 @@ void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F **h_long)
   }
 }
 
-void makePlots(int combination, TCanvas *c, int np, int npmax, TH1F **h_long, int *maxPeak, int *maxPlate) {
+void makePlots(int combination, TCanvas *c, int np, int npmax, TH1F *h_long, int *maxPeak, int *maxPlate) {
   int idx = (np%3) +1;
   if (idx==1) c->Clear("D");
   c->cd(idx)->SetGrid(1,0);
@@ -130,7 +130,7 @@ void makeNtuple(int combination, int np, TH1F **h_long, TObjArray &peaks, int *r
     findStart(h_long[i], &firstPlate, &lastPlate);
     makePlots(combination, c2, i, np, h_long[i], &maxPeak, &maxPlate);
     int nseg = h_long[i]->Integral(firstPlate, lastPlate);
-    ntuple->Fill(combination, i+1, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, &ranks[i]);
+    ntuple->Fill(combination, i+1, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, ranks[i]);
   }
 
   output->Write();
