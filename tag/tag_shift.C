@@ -100,9 +100,9 @@ void makePlots(int combination, TCanvas *c, int np, int npmax, TH1F* h_long, int
   h_long->SetLineColor(1);
   h_long->SetLineWidth(2);
   h_long->Draw("hist");
-  if(np == 2)                 c->Print(Form("%s/longitudinal_xz_%i.pdf(", path, combination), "pdf");
-  else if(np == npmax-1)      c->Print(Form("%s/longitudinal_xz_%i.pdf)", path, combination), "pdf");
-  else if(idx == 3 && np >2 ) c->Print(Form("%s/longitudinal_xz_%i.pdf", path, combination), "pdf");
+  if(np == 2)                 c->Print(Form("%s/shift_full/longitudinal_xz_%i.pdf(", path, combination), "pdf");
+  else if(np == npmax-1)      c->Print(Form("%s/shift_full/longitudinal_xz_%i.pdf)", path, combination), "pdf");
+  else if(idx == 3 && np >2 ) c->Print(Form("%s/shift_full/longitudinal_xz_%i.pdf", path, combination), "pdf");
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axis?
@@ -114,7 +114,7 @@ void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axi
 void makeNtuple(int combination, int np, TH1F *h_long[np], TObjArray &peaks, int ranks[np]) {
   TString outputFileName = TString::Format("%s/shift_full/peaks_shift_%d.root", path, combination);
   TFile *outputFile = new TFile(outputFileName, "RECREATE");
-  TFile *output = new TFile(Form("%s/peaks_shift_%i.root", path,combination),"RECREATE");
+  TFile *output = new TFile(Form("%s/shift_full/peaks_shift_%i.root", path,combination),"RECREATE");
   TNtuple *ntuple = new TNtuple("showers","tagged showers","combination:tag:x:y:start:end:peak:maxplate:nseg:rankbin");
   TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
   c2->Divide(1,3);
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
   TString file =  TString::Format("%s/shift_full/histo_shifts_%d.root", path, combination);
   TFile* f = TFile::Open(file);
 
-  int ntag = 100;
+  int ntag = 20;
   TH2F *h2 = (TH2F *)(f->Get("XYseg"));
   // h2->Smooth();
   TCanvas *c = new TCanvas("c", "c", 800, 800);
