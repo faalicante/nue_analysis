@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
   TString file =  TString::Format("%s/histo_shifts_%d.root", path, combination);
   TFile* f = TFile::Open(file);
 
-  int ntag = 20;
+  int ntag = 100;
   TH2F *h2 = (TH2F *)(f->Get("XYseg"));
   // h2->Smooth();
   TCanvas *c = new TCanvas("c", "c", 800, 800);
