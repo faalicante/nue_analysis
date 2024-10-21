@@ -31,6 +31,7 @@ _count = array('i', [0])
 _nHits = array('i', [0])
 _ex = array('f', [0])
 _ey = array('f', [0])
+_ez = array('f', [0])
 _x = array('f', N*[0])
 _y = array('f', N*[0])
 _z = array('f', N*[0])
@@ -42,6 +43,7 @@ tree.Branch("count", _count, "count/I")
 tree.Branch("nHits", _nHits, "nHits/I")
 tree.Branch("ex", _ex, "ex/F")
 tree.Branch("ey", _ey, "ey/F")
+tree.Branch("ez", _ey, "ey/F")
 tree.Branch("x", _x, "x[count]/F")
 tree.Branch("y", _y, "y[count]/F")
 tree.Branch("z", _z, "z[count]/F")
@@ -61,6 +63,7 @@ for ievt in range(cbmsim.GetEntries()):
         if trackID < 0: continue
         ex = cbmsim.MCTrack[1].GetStartX()
         ey = cbmsim.MCTrack[1].GetStartY()
+        ez = cbmsim.MCTrack[1].GetStartZ()
         if cbmsim.MCTrack[trackID].GetProcID()==5 and cbmsim.MCTrack[trackID].GetEnergy() >= 0.1:
             detID = eHit.GetDetectorID()
             brickDet = DecodeBrickID(detID)
@@ -88,6 +91,7 @@ for ievt in range(cbmsim.GetEntries()):
         _nHits[0] = nHits
         _ex[0] = ex
         _ey[0] = ey
+        _ez[0] = ez
         tree.Fill()
     # for track in cbmsim.MCTrack:
     #     x = track.GetStartX()
