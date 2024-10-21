@@ -35,17 +35,21 @@ const int shiftRange = 50; //mrad
 const int shiftStep  = 2;   //mrad
 const int stepZ      = 1000 + 350; //um
 
-const int xMin = 0;       //add switch case (at the end of the code)
-const int xMax = 200000;
-const int yMin = 0;  
-const int yMax = 200000;
+// const int xMin = 0;       //add switch case (at the end of the code)
+// const int xMax = 200000;
+// const int yMin = 0;
+// const int yMax = 200000;
+
+// Muons
+const int xMin = 289000;
+const int xMax = 300000;
+const int yMin = 84000;
+const int yMax = 95000;
 
 const int xBin = int((xMax - xMin) / binSize);
 const int yBin = int((yMax - yMin) / binSize);
 
 TH2F* cropHist(TH2F* h2, double shiftX, double shiftY) {
-    // const int xBin = (82500 - 71500) / 50;
-    // const int yBin = (96500 - 85500) / 50;
     TH2F* hCrop = new TH2F(h2->GetTitle(), h2->GetTitle(), xBin, xMin, xMax, yBin, yMin, yMax);
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
         double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
@@ -73,7 +77,9 @@ int main(int argc, char* argv[]) {
 
     const char* path = "/Users/fabioali/cernbox";
     // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022";
-    TString file = TString::Format("%s/hist_XYP_nue.root", path);
+    // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
+    // TString file = TString::Format("%s/hist_XYP_nue.root", path);
+    TString file = TString::Format("%s/hist_XYP_muon.root", path);
     std::map<std::string, TH2F*> h = loadHists(file.Data());
 
     int combination = 0;
