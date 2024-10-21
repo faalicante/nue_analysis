@@ -81,6 +81,7 @@ int main(int argc, char* argv[]) {
     const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
     // TString file = TString::Format("%s/hist_XYP_nue.root", path);
     TString file = TString::Format("%s/hist_XYP_muon.root", path);
+    TFile *inputFile = new TFile::Open(TString::Format("%s/hist_XYP_muon.root", path));
     // std::map<std::string, TH2F*> h = loadHists(file.Data());
 
     int combination = 0;
@@ -104,7 +105,7 @@ int main(int argc, char* argv[]) {
                 double shiftY = shiftTY / 1000.0 * stepZ * layer;
                 
                 // TString histName = TString::Format("XYseg_%d", plate);
-                TH3F *h3 = (TH3F*)(file.Get("XYPseg"));
+                TH3F *h3 = (TH3F*)(inputFile->Get("XYPseg"));
                 h3->GetZaxis()->SetRange(plate,plate);
                 TH2F *h = (TH2F*)(h3->Project3D("yx"));
                 TH2F* hCrop = cropHist(h, shiftX, shiftY);
