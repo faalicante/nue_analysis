@@ -75,9 +75,9 @@ int main(int argc, char* argv[]) {
     }
     int partition = std::atoi(argv[1]);
 
-    const char* path = "/Users/fabioali/cernbox";
+    // const char* path = "/Users/fabioali/cernbox";
     // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022";
-    // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
+    const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
     // TString file = TString::Format("%s/hist_XYP_nue.root", path);
     TString file = TString::Format("%s/hist_XYP_muon.root", path);
     std::map<std::string, TH2F*> h = loadHists(file.Data());
