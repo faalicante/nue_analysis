@@ -120,9 +120,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Clean up
-    for (auto& pair : h) {
-        delete pair.second;
-    }
+    // for (auto& pair : h) {
+    //     delete pair.second;
+    // }
 
     return 0;
 }
