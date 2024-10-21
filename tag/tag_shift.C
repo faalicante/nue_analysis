@@ -1,5 +1,6 @@
 #include "TFile.h"
 #include "TH2F.h"
+#include "TH3F.h"
 #include "TROOT.h"
 #include "TCanvas.h"
 #include "TEllipse.h"
@@ -9,7 +10,28 @@
 #include <iostream>
 
 // const char *path = "/Users/fabioali/cernbox/shift_full";
-const char *path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift_full";
+// const char *path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022/shift_full";
+const char *path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021/shift_full";
+
+void eval_bkg(TH2F &h2, float *bkg) { //just one clear area
+  float x1 = 292000; //b11 293000 //b21 292000 //b31 292000 //b41 292000 //b51 294000
+  float y1 = 91500;  //b11 88000  //b21 91500  //b31 88000  //b41 92000  //b51 90000
+  float r1 = 300;
+
+  int xmi1 = (int)(x1-r1);
+  int xma1 = (int)(x1+r1);
+  int ymi1 = (int)(y1-r1);
+  int yma1 = (int)(y1+r1);
+
+  int xmax1 = h2.GetXaxis()->FindBin(xma1);
+  int xmin1 = h2.GetXaxis()->FindBin(xmi1);
+  int ymax1 = h2.GetYaxis()->FindBin(yma1);
+  int ymin1 = h2.GetYaxis()->FindBin(ymi1);
+
+  float bkg1 = h2.Integral(xmin1,xmax1,ymin1,ymax1)/(xmax1-xmin1+1)/(ymax1-ymin1+1);
+  *bkg = bkg1;
+  // printf("Average background %f\n", *bkg);
+}
 
 int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt) {
   Int_t MaxBin = h2.GetMaximumBin();
@@ -145,10 +167,10 @@ int main(int argc, char* argv[]) {
   int combination = std::atoi(argv[1]);
   TString file =  TString::Format("%s/histo_shifts_%d.root", path, combination);
   TFile* f = TFile::Open(file);
-
-  int ntag = 100;
   TH2F *h2 = (TH2F *)(f->Get("XYseg"));
-  // h2->Smooth();
+  TH3F *h3 = (TH3F *)(f->Get("XYPseg"));
+  int ntag = 50;
+  h2->Smooth();
   TCanvas *c = new TCanvas("c", "c", 800, 800);
   c->SetGrid();
   gStyle->SetOptStat(0);
@@ -173,8 +195,10 @@ int main(int argc, char* argv[]) {
   const int nplates = 60; //change nplates for mc
   for(int p=1; p<=nplates; p++) { 
     printf("Plate %i\n", p);
-    TH2F *h = (TH2F *)(f->Get(Form("XYPseg_%i",p)));
-    // h->Smooth();
+    // TH2F *h = (TH2F *)(f->Get(Form("XYPseg_%i",p)));
+    h3->GetZaxis()->SetRange(p,p);
+    TH2F *h = (TH2F*)(h3->Project3D("yx"));
+    h->Smooth();
     h->SetTitle(Form("Plate %i",p));
     h->Draw("colz");
 
