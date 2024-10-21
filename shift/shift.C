@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
     const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
     // TString file = TString::Format("%s/hist_XYP_nue.root", path);
     TString file = TString::Format("%s/hist_XYP_muon.root", path);
-    TFile *inputFile = new TFile::Open(TString::Format("%s/hist_XYP_muon.root", path));
+    TFile *inputFile = TFile::Open(TString::Format("%s/hist_XYP_muon.root", path));
     // std::map<std::string, TH2F*> h = loadHists(file.Data());
 
     int combination = 0;
