@@ -50,6 +50,31 @@ const int yMax = 95000;
 const int xBin = int((xMax - xMin) / binSize);
 const int yBin = int((yMax - yMin) / binSize);
 
+// const char* path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
+
+// TH2F* matrixCells(int fragment, int plate) {
+//     TList *list = new TList;
+//     TString histName = TString::Format("XYseg_%d", plate);
+//     for (int yCell = fragment-18; yCell <= fragment+18; yCell +=18) {
+//         for (int xCell = yCell-1; xCell <= yCell+1; xCell++) {
+//             TString file = TString::Format("%s/hist_XYP_b121_%i.root", path, xCell);
+//             std::map<std::string, TH2F*> h = loadHists(file.Data());
+//             list->Add(h[histName.Data()]);
+//             // Clean up
+//             for (auto& pair : h) {
+//                 delete pair.second;
+//             }
+//         }
+//     }
+
+//     TH2F *hm = (TH2F*)(((TH2F*)list->At(0))->Clone("hm"));
+//     hm->Reset();
+//     hm->Merge(list);
+//     delete list;
+
+//     return hm;
+// }
+
 TH2F* cropHist(TH2F* h2, double shiftX, double shiftY) {
     TH2F* hCrop = new TH2F(h2->GetTitle(), h2->GetTitle(), xBin, xMin, xMax, yBin, yMin, yMax);
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
@@ -69,20 +94,20 @@ TH2F* cropHist(TH2F* h2, double shiftX, double shiftY) {
     return hCrop;
 }
 
+
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
+    if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <partition>" << std::endl;
         return 1;
     }
+    // int fragment = std::atoi(argv[1]);
     int partition = std::atoi(argv[1]);
 
     // const char* path = "/Users/fabioali/cernbox";
     // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022";
     const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
     // TString file = TString::Format("%s/hist_XYP_nue.root", path);
-    TString file = TString::Format("%s/hist_XYP_muon.root", path);
     TFile *inputFile = TFile::Open(TString::Format("%s/hist_XYP_muon.root", path));
-    // std::map<std::string, TH2F*> h = loadHists(file.Data());
 
     int combination = 0;
     int combStart = partition * 100;
@@ -104,11 +129,14 @@ int main(int argc, char* argv[]) {
                 double shiftX = shiftTX / 1000.0 * stepZ * layer;
                 double shiftY = shiftTY / 1000.0 * stepZ * layer;
                 
-                // TString histName = TString::Format("XYseg_%d", plate);
                 TH3F *h3 = (TH3F*)(inputFile->Get("XYPseg"));
                 h3->GetZaxis()->SetRange(plate,plate);
                 TH2F *h = (TH2F*)(h3->Project3D("yx"));
+                h->SetTitle(Form("Plate %d",plate));
                 TH2F* hCrop = cropHist(h, shiftX, shiftY);
+                // TString histName = TString::Format("XYseg_%d", plate);
+                // TH2F* hm = matrixCells(fragment, plate);
+                // TH2F* hCrop = cropHist(hm, shiftX, shiftY);
                 // TH2F* hCrop = cropHist(h[histName.Data()], shiftX, shiftY);
                 hCrop->Write();
                 hComb->Add(hCrop);
