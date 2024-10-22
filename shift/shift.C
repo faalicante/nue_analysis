@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
             combination++;
             if (combination < combStart || combination >= combEnd) continue;
 
-            TString outputFileName = TString::Format("%s/shift_full/histo_shifts_%d.root", path, combination);
+            TString outputFileName = TString::Format("%s/shift_full/histo_shifts_%d-%d.root", path, fragment, combination);
 	        TFile *outputFile = new TFile(outputFileName, "RECREATE");
             std::cout << "Combination " << combination << std::endl;
 
@@ -244,3 +244,5 @@ int main(int argc, char* argv[]) {
 //     printf("OffsetX: %d, OffsetY: %d\n", offsetx, offsety);
 //     return 0;
 // }
+
+// make case for sig bkg data
