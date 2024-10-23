@@ -82,13 +82,7 @@ TH2F* matrixCells(int fragment, int plate) {
     return hm;
 }
 
-TH2F* cropHist(TH2F* h2, double shiftX, double shiftY, int xLow, int yLow) {
-    int xMax = xLow + 11000;
-    int yMax = yLow + 11000;
-    int xMin = xLow - 1000;
-    int yMin = yLow - 1000;
-    int xBin = int((xMax - xMin) / binSize);
-    int yBin = int((yMax - yMin) / binSize);
+TH2F* cropHist(TH2F* h2, double shiftX, double shiftY, int xBin, int xMin, int xMax, int yBin, int yMin, int yMax) {
     TH2F* hCrop = new TH2F(h2->GetTitle(), h2->GetTitle(), xBin, xMin, xMax, yBin, yMin, yMax);
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
         double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
@@ -122,7 +116,13 @@ int main(int argc, char* argv[]) {
     TString file = TString::Format("%s/hist_XYP_b121_%i.root", path, fragment);
     std::map<std::string, TH2F*> h = loadHists(file.Data());
     setRange(h["XYseg_1"], &xLow, &yLow);
-
+    int xMax = xLow + 11000;
+    int yMax = yLow + 11000;
+    int xMin = xLow - 1000;
+    int yMin = yLow - 1000;
+    int xBin = int((xMax - xMin) / binSize);
+    int yBin = int((yMax - yMin) / binSize);
+    
     // const char* path = "/Users/fabioali/cernbox";
     // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022";
     // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
@@ -138,41 +138,43 @@ int main(int argc, char* argv[]) {
             combination++;
             if (combination < combStart || combination >= combEnd) continue;
 
-            TString outputFileName = TString::Format("%s/shift_full/histo_shifts_%d-%d.root", path, fragment, combination);
+            TString outputFileName = TString::Format("%s/shift_full/histo_shifts_%i_%i.root", path, fragment, combination);
 	        TFile *outputFile = new TFile(outputFileName, "RECREATE");
             std::cout << "Combination " << combination << std::endl;
 
-            TList *list = new TList;
-            // TH2F* hComb = new TH2F("XYseg", "XYseg", xBin, xMin, xMax, yBin, yMin, yMax);
+            // TList *list = new TList;
+            TH2F* hComb = new TH2F("XYseg", "XYseg", xBin, xMin, xMax, yBin, yMin, yMax);
             
-            TH2F* hCrop;
+            // TH2F* hm;
+            // TH2F* hCrop;
             for (int layer = 0; layer < 57; ++layer) {
                 int plate = layer + 1;
                 double shiftX = shiftTX / 1000.0 * stepZ * layer;
                 double shiftY = shiftTY / 1000.0 * stepZ * layer;
                 
+                std::cout << plate << std::endl;
                 // TH3F *h3 = (TH3F*)(inputFile->Get("XYPseg"));
                 // h3->GetZaxis()->SetRange(plate,plate);
                 // TH2F *h = (TH2F*)(h3->Project3D("yx"));
                 // h->SetTitle(Form("Plate %d",plate));
                 // TH2F* hCrop = cropHist(h, shiftX, shiftY);
-                TString histName = TString::Format("XYseg_%d", plate);
+                // TString histName = TString::Format("XYseg_%d", plate);
                 TH2F* hm = matrixCells(fragment, plate);
-                hm->SetName(histName.Data());
-                hCrop = cropHist(hm, shiftX, shiftY, xLow, yLow);
-                delete hm;
+                // hm->SetName(histName.Data());
+                TH2F* hCrop = cropHist(hm, shiftX, shiftY, xBin, xMin, xMax, yBin, yMin, yMax);
                 // TH2F* hCrop = cropHist(h[histName.Data()], shiftX, shiftY);
                 outputFile->cd();
                 hCrop->Write();
-                list->Add(hCrop);
-                // std::cout << plate << std::endl;
+                // list->Add(hCrop);
+                hComb->Add(hCrop);
+                delete hm;
+                delete hCrop;
             }
-            delete hCrop;
-            TH2F *hComb = (TH2F*)(((TH2F*)list->At(0))->Clone("hComb"));
-            hComb->Reset();
-            hComb->Merge(list);
-            hComb->SetNameTitle("XYseg","XYseg");
-            delete list;
+            // TH2F *hComb = (TH2F*)(((TH2F*)list->At(0))->Clone("hComb"));
+            // hComb->Reset();
+            // hComb->Merge(list);
+            // hComb->SetNameTitle("XYseg","XYseg");
+            // delete list;
             outputFile->cd();
             hComb->Write();
             delete hComb;
