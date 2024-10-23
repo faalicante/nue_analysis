@@ -21,7 +21,7 @@ std::map<std::string, TH2F*> loadHists(const char* histFile) {
     TKey* key;
     TString exclude = "segments";
     while ((key = (TKey*)next())) {
-        TString keyName = key->GetName();s
+        TString keyName = key->GetName();
         if (keyName == exclude) continue;
         std::cout << key->GetName() << std::endl;
         TH2F* hist = (TH2F*)f->Get(key->GetName());
