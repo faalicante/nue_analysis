@@ -19,7 +19,11 @@ std::map<std::string, TH2F*> loadHists(const char* histFile) {
     TList* keyList = f->GetListOfKeys();
     TIter next(keyList);
     TKey* key;
+    TString exclude = "segments";
     while ((key = (TKey*)next())) {
+        TString keyName = key->GetName();s
+        if (keyName == exclude) continue;
+        std::cout << key->GetName() << std::endl;
         TH2F* hist = (TH2F*)f->Get(key->GetName());
         hist->SetDirectory(gROOT);
         hist->SetName(key->GetName());
@@ -54,23 +58,32 @@ const char* path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
 // const char* path = "/Users/fabioali/cernbox";
 
 
-void setRange(TH2F* h2, int* xLow, int* yLow) {
+void setRange(int fragment, int* xLow, int* yLow) {
+    TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path, fragment);
+    TFile* f = TFile::Open(histFile);
+    TH2F* h2 = (TH2F*)f->Get("XYseg_1");
     *xLow = h2->GetXaxis()->GetXmin();
     *yLow = h2->GetYaxis()->GetXmin();
+    f->Close();
 }
 
 TH2F* matrixCells(int fragment, int plate) {
     TList *list = new TList;
+    // TFile* f;
+    // TH2F* h2;
     TString histName = TString::Format("XYseg_%d", plate);
     for (int yCell = fragment-18; yCell <= fragment+18; yCell +=18) {
         for (int xCell = yCell-1; xCell <= yCell+1; xCell++) {
-            TString file = TString::Format("%s/hist_XYP_b121_%i.root", path, xCell);
-            std::map<std::string, TH2F*> h = loadHists(file.Data());
+            TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path, xCell);
+            // f = TFile::Open(histFile);
+            // TH2F* h2 = (TH2F*)f->Get(histName.Data());
+            // h2->SetDirectory(gROOT);
+            // h2->SetName(histName);
+            
+            std::map<std::string, TH2F*> h = loadHists(histFile.Data());
             list->Add(h[histName.Data()]);
-            // Clean up
-            // for (auto& pair : h) {
-            //     delete pair.second;
-            // }
+            // list->Add(h2);
+            // delete h2;
         }
     }
     
@@ -78,11 +91,13 @@ TH2F* matrixCells(int fragment, int plate) {
     hm->Reset();
     hm->Merge(list);
     delete list;
+    // f->Close();
 
     return hm;
 }
 
 TH2F* cropHist(TH2F* h2, double shiftX, double shiftY, int xBin, int xMin, int xMax, int yBin, int yMin, int yMax) {
+    std::cout << h2->GetTitle() << std::endl;
     TH2F* hCrop = new TH2F(h2->GetTitle(), h2->GetTitle(), xBin, xMin, xMax, yBin, yMin, yMax);
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
         double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
@@ -113,9 +128,11 @@ int main(int argc, char* argv[]) {
     int xLow = 0;
     int yLow = 0;
 
-    TString file = TString::Format("%s/hist_XYP_b121_%i.root", path, fragment);
-    std::map<std::string, TH2F*> h = loadHists(file.Data());
-    setRange(h["XYseg_1"], &xLow, &yLow);
+
+    TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path, fragment);
+    // std::map<std::string, TH2F*> h = loadHists(file.Data());
+    setRange(fragment, &xLow, &yLow);
+    // setRange(h["XYseg_1"], &xLow, &yLow);
     int xMax = xLow + 11000;
     int yMax = yLow + 11000;
     int xMin = xLow - 1000;
