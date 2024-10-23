@@ -23,7 +23,6 @@ std::map<std::string, TH2F*> loadHists(const char* histFile) {
     while ((key = (TKey*)next())) {
         TString keyName = key->GetName();
         if (keyName == exclude) continue;
-        std::cout << key->GetName() << std::endl;
         TH2F* hist = (TH2F*)f->Get(key->GetName());
         hist->SetDirectory(gROOT);
         hist->SetName(key->GetName());
@@ -169,7 +168,7 @@ int main(int argc, char* argv[]) {
                 double shiftX = shiftTX / 1000.0 * stepZ * layer;
                 double shiftY = shiftTY / 1000.0 * stepZ * layer;
                 
-                std::cout << plate << std::endl;
+                // std::cout << plate << std::endl;
                 // TH3F *h3 = (TH3F*)(inputFile->Get("XYPseg"));
                 // h3->GetZaxis()->SetRange(plate,plate);
                 // TH2F *h = (TH2F*)(h3->Project3D("yx"));
