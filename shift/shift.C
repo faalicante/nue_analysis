@@ -11,7 +11,6 @@
 #include <stdexcept>
 #include <cmath>
 
-
 // Function to load histograms
 std::map<std::string, TH2F*> loadHists(const char* histFile) {
     TFile* f = TFile::Open(histFile);
@@ -38,65 +37,69 @@ const int binSize    = 50;  //um
 const int shiftRange = 50; //mrad
 const int shiftStep  = 2;   //mrad
 const int stepZ      = 1000 + 350; //um
+int xMin, xMax, yMin, yMax, xBin, yBin;
+TString path;
+// TString path = "/Users/fabioali/cernbox"; //for local test
 
-// const int xMin = 0;       //add switch case (at the end of the code)
-// const int xMax = 200000;
-// const int yMin = 0;
-// const int yMax = 200000;
-
-// Muons
-// int xMin = 289000;
-// int xMax = 300000;
-// int yMin = 84000;
-// int yMax = 95000;
-
-// int xBin = int((xMax - xMin) / binSize);
-// int yBin = int((yMax - yMin) / binSize);
-
-const char* path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
-// const char* path = "/Users/fabioali/cernbox";
-
-
-void setRange(int fragment, int* xLow, int* yLow) {
-    TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path, fragment);
-    TFile* f = TFile::Open(histFile);
-    TH2F* h2 = (TH2F*)f->Get("XYseg_1");
-    *xLow = h2->GetXaxis()->GetXmin();
-    *yLow = h2->GetYaxis()->GetXmin();
-    f->Close();
+void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin) {
+    if (data==0) {
+        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%05i", fragment);
+        *xMin = 284000;
+        *xMax = 304000;
+        *yMin = 79000;
+        *yMax = 99000;
+    }
+    else if (data==1) {
+        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%05i", fragment);
+        *xMin = 0;
+        *xMax = 200000;
+        *yMin = 0;
+        *yMax = 200000;
+    }
+    else if (data==2) {
+        *path = "/Users/fabioali/cernbox";
+        // *path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
+        const int xLow = fragment / 18;
+        const int yLow = fragment % 18;
+        *xMin = xLow*10000 + 3000;
+        *xMax = xLow*10000 + 17000;
+        *yMin = yLow*10000 + 3000;
+        *yMax = yLow*10000 + 17000;
+    }
+    *xBin = int((*xMax - *xMin) / binSize);
+    *yBin = int((*yMax - *yMin) / binSize);
 }
 
-TH2F* matrixCells(int fragment, int plate) {
-    TList *list = new TList;
-    // TFile* f;
-    // TH2F* h2;
-    TString histName = TString::Format("XYseg_%d", plate);
+void openFiles(int fragment, TFile* f[9]) {
+    int idx = 0;
     for (int yCell = fragment-18; yCell <= fragment+18; yCell +=18) {
         for (int xCell = yCell-1; xCell <= yCell+1; xCell++) {
-            TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path, xCell);
-            // f = TFile::Open(histFile);
-            // TH2F* h2 = (TH2F*)f->Get(histName.Data());
-            // h2->SetDirectory(gROOT);
-            // h2->SetName(histName);
-            
-            std::map<std::string, TH2F*> h = loadHists(histFile.Data());
-            list->Add(h[histName.Data()]);
-            // list->Add(h2);
-            // delete h2;
+            if (xCell < 0) continue;
+            TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path.Data(), xCell);
+            f[idx] = TFile::Open(histFile);
+            idx++;   
         }
     }
-    
-    TH2F *hm = (TH2F*)(((TH2F*)list->At(0))->Clone("hm"));
-    hm->Reset();
-    hm->Merge(list);
-    delete list;
-    // f->Close();
+}
 
+TH2F* matrixCells(TFile* f[9], int plate) {
+    TString histName = TString::Format("XYseg_%d", plate);
+    TString histTitle = TString::Format("XYPseg_%d", plate);
+    TList *list = new TList;
+    TH2F* hm = new TH2F(histName, histTitle, xBin, xMin, xMax, yBin, yMin, yMax);
+    TH2F* h2;
+    for (int i = 0; i < 9; i++) {
+        // std::cout << f[i] << std::endl;
+        h2 = (TH2F*)f[i]->Get(histName);
+        list->Add(h2);
+    }
+    hm->Merge(list);
+    delete h2;
+    delete list;
     return hm;
 }
 
-TH2F* cropHist(TH2F* h2, double shiftX, double shiftY, int xBin, int xMin, int xMax, int yBin, int yMin, int yMax) {
-    std::cout << h2->GetTitle() << std::endl;
+TH2F* cropHist(TH2F* h2, double shiftX, double shiftY) {
     TH2F* hCrop = new TH2F(h2->GetTitle(), h2->GetTitle(), xBin, xMin, xMax, yBin, yMin, yMax);
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
         double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
@@ -115,95 +118,92 @@ TH2F* cropHist(TH2F* h2, double shiftX, double shiftY, int xBin, int xMin, int x
     return hCrop;
 }
 
-
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <partition>" << std::endl;
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <partition>" << argv[2] << " <fragment>" << std::endl;
+        // data = {0: muon, 1: nue, 2: data}
+        // fragment for MC is brick
         return 1;
     }
-    int fragment = std::atoi(argv[1]);
+    int data = std::atoi(argv[1]);
     int partition = std::atoi(argv[2]);
+    int fragment = std::atoi(argv[3]);
 
-    int xLow = 0;
-    int yLow = 0;
-
-
-    TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path, fragment);
-    // std::map<std::string, TH2F*> h = loadHists(file.Data());
-    setRange(fragment, &xLow, &yLow);
-    // setRange(h["XYseg_1"], &xLow, &yLow);
-    int xMax = xLow + 11000;
-    int yMax = yLow + 11000;
-    int xMin = xLow - 1000;
-    int yMin = yLow - 1000;
-    int xBin = int((xMax - xMin) / binSize);
-    int yBin = int((yMax - yMin) / binSize);
+    setRange(data, &path, fragment, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin);
     
-    // const char* path = "/Users/fabioali/cernbox";
-    // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b000022";
-    // const char* path = "/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b000021";
-    // TString file = TString::Format("%s/hist_XYP_nue.root", path);
-    // TFile *inputFile = TFile::Open(TString::Format("%s/hist_XYP_muon.root", path));
+    TH2::AddDirectory(false);
+    TH2F* h2, *hCrop;
+    TH3F* h3;
+    TH2F* hComb = new TH2F("XYseg", "XYseg", xBin, xMin, xMax, yBin, yMin, yMax);
+    TFile* f, *ff[9];
+
+    if (data==0) {
+        TString fileName = TString::Format("%s/hist_XYP_muon.root", path.Data());
+        f = TFile::Open(fileName);
+        h3 = (TH3F*)(f->Get("XYPseg"));
+    }
+    else if (data==1) {
+        TString fileName = TString::Format("%s/hist_XYP_nue.root", path.Data());
+        f = TFile::Open(fileName);
+    }
+    else if (data==2) {
+        openFiles(fragment, &ff[0]);
+    }
 
     int combination = 0;
     int combStart = partition * 100;
-    int combEnd = combStart + 100;
-
+    int combEnd = combStart + 5;
+    
     for (double shiftTX = -shiftRange; shiftTX <= shiftRange; shiftTX += shiftStep) {
         for (double shiftTY = -shiftRange; shiftTY <= shiftRange; shiftTY += shiftStep) {
             combination++;
             if (combination < combStart || combination >= combEnd) continue;
 
-            TString outputFileName = TString::Format("%s/shift_full/histo_shifts_%i_%i.root", path, fragment, combination);
-	        TFile *outputFile = new TFile(outputFileName, "RECREATE");
+            TString outputName = TString::Format("%s/shift/histo_shifts_%i_%i.root", path.Data(), fragment, combination);
+	        TFile *outputFile = new TFile(outputName, "RECREATE");
             std::cout << "Combination " << combination << std::endl;
 
-            // TList *list = new TList;
-            TH2F* hComb = new TH2F("XYseg", "XYseg", xBin, xMin, xMax, yBin, yMin, yMax);
-            
-            // TH2F* hm;
-            // TH2F* hCrop;
+            hComb->Reset();
             for (int layer = 0; layer < 57; ++layer) {
                 int plate = layer + 1;
                 double shiftX = shiftTX / 1000.0 * stepZ * layer;
                 double shiftY = shiftTY / 1000.0 * stepZ * layer;
-                
-                // std::cout << plate << std::endl;
-                // TH3F *h3 = (TH3F*)(inputFile->Get("XYPseg"));
-                // h3->GetZaxis()->SetRange(plate,plate);
-                // TH2F *h = (TH2F*)(h3->Project3D("yx"));
-                // h->SetTitle(Form("Plate %d",plate));
-                // TH2F* hCrop = cropHist(h, shiftX, shiftY);
-                // TString histName = TString::Format("XYseg_%d", plate);
-                TH2F* hm = matrixCells(fragment, plate);
-                // hm->SetName(histName.Data());
-                TH2F* hCrop = cropHist(hm, shiftX, shiftY, xBin, xMin, xMax, yBin, yMin, yMax);
-                // TH2F* hCrop = cropHist(h[histName.Data()], shiftX, shiftY);
+
+                TString histName = TString::Format("XYseg_%d", plate);
+                TString histTitle = TString::Format("XYPseg_%d", plate);
+
+                if (data == 0) {
+                    h3->GetZaxis()->SetRange(plate,plate);
+                    h2 = (TH2F*)(h3->Project3D("yx"));
+                    h2->SetNameTitle(histName.Data(), histTitle);
+                }
+                else if (data==1) {
+                    h2 = (TH2F*)(f->Get(histName.Data()));
+                }
+                else if (data==2) {
+                    h2 = matrixCells(&ff[0], plate);
+                }
+                hCrop = cropHist(h2, shiftX, shiftY);
+                delete h2;
+                hComb->Add(hCrop);
                 outputFile->cd();
                 hCrop->Write();
-                // list->Add(hCrop);
-                hComb->Add(hCrop);
-                delete hm;
                 delete hCrop;
+                std::cout << plate << std::endl;
             }
-            // TH2F *hComb = (TH2F*)(((TH2F*)list->At(0))->Clone("hComb"));
-            // hComb->Reset();
-            // hComb->Merge(list);
-            // hComb->SetNameTitle("XYseg","XYseg");
-            // delete list;
             outputFile->cd();
             hComb->Write();
-            delete hComb;
             outputFile->Close();
             delete outputFile;
         }
     }
-
-    // Clean up
-    // for (auto& pair : h) {
-    //     delete pair.second;
-    // }
-
+    delete h3;
+    if (data!=2) f->Close();
+    else {
+        for (int i = 0; i < 9; i++) {
+            ff[i]->Close();
+        }
+    }
     return 0;
 }
 
@@ -262,5 +262,3 @@ int main(int argc, char* argv[]) {
 //     printf("OffsetX: %d, OffsetY: %d\n", offsetx, offsety);
 //     return 0;
 // }
-
-// make case for sig bkg data
