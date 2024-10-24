@@ -5,6 +5,7 @@
 #include "TROOT.h"
 #include "TList.h"
 #include "TSystem.h"
+#include "TStopwatch.h"
 #include <iostream>
 #include <map>
 #include <vector>
@@ -32,6 +33,16 @@ std::map<std::string, TH2F*> loadHists(const char* histFile) {
     return histList;
 }
 
+
+
+void printMemoryInfo() {
+    ProcInfo_t procInfo;  // Declare a ProcInfo_t structure
+    gSystem->GetProcInfo(&procInfo);  // Pass its pointer to GetProcInfo
+
+    Long64_t mem = procInfo.fMemResident;  // Access the memory resident field
+    std::cout << "Memory used: " << mem/1024 << " MB" << std::endl;
+}
+
 // Parameters
 const int binSize    = 50;  //um
 const int shiftRange = 50; //mrad
@@ -57,8 +68,8 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
         *yMax = 200000;
     }
     else if (data==2) {
-        *path = "/Users/fabioali/cernbox";
-        // *path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
+        // *path = "/Users/fabioali/cernbox";
+        *path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
         const int xLow = fragment / 18;
         const int yLow = fragment % 18;
         *xMin = xLow*10000 + 3000;
@@ -152,10 +163,13 @@ int main(int argc, char* argv[]) {
 
     int combination = 0;
     int combStart = partition * 100;
-    int combEnd = combStart + 5;
-    
+    int combEnd = combStart + 100;
+
+    TStopwatch stopWatch;
+    stopWatch.Start();
     for (double shiftTX = -shiftRange; shiftTX <= shiftRange; shiftTX += shiftStep) {
         for (double shiftTY = -shiftRange; shiftTY <= shiftRange; shiftTY += shiftStep) {
+            stopWatch.Continue();
             combination++;
             if (combination < combStart || combination >= combEnd) continue;
 
@@ -189,12 +203,14 @@ int main(int argc, char* argv[]) {
                 outputFile->cd();
                 hCrop->Write();
                 delete hCrop;
-                std::cout << plate << std::endl;
+                // std::cout << plate << std::endl;
             }
             outputFile->cd();
             hComb->Write();
             outputFile->Close();
             delete outputFile;
+            stopWatch.RealTime();
+            printMemoryInfo();
         }
     }
     delete h3;
