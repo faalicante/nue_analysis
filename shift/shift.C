@@ -131,7 +131,7 @@ TH2F* cropHist(TH2F* h2, double shiftX, double shiftY) {
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <partition>" << argv[2] << " <fragment>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <partition>" << argv[2] << " <fragment>" << argv[3] << std::endl;
         // data = {0: muon, 1: nue, 2: data}
         // fragment for MC is brick
         return 1;
@@ -162,8 +162,8 @@ int main(int argc, char* argv[]) {
     }
 
     int combination = 0;
-    int combStart = partition * 100;
-    int combEnd = combStart + 100;
+    int combStart = partition * 1000;
+    int combEnd = combStart + 1000;
 
     TStopwatch stopWatch;
     stopWatch.Start();
@@ -209,7 +209,7 @@ int main(int argc, char* argv[]) {
             hComb->Write();
             outputFile->Close();
             delete outputFile;
-            stopWatch.RealTime();
+            std::cout << "Time: " << stopWatch.RealTime() << std::endl;
             printMemoryInfo();
         }
     }
