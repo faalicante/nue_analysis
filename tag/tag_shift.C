@@ -249,8 +249,7 @@ int main(int argc, char* argv[]) {
     h_long[i] = new TH1F(Form("h_long_%i", i+1),Form("Cluster %i;plate;%%segments", i+1), 60, 1, 61);
   }
 
-  const int nplates = 60; //change nplates for mc
-  for(int p=1; p<=nplates; p++) { 
+  for(int p=1; p<=nPlates; p++) { 
     printf("Plate %i\n", p);
     TH2F *h = (TH2F *)(f->Get(Form("XYPseg_%i",p)));
     h->Smooth();
