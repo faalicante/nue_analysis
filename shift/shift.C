@@ -7,6 +7,7 @@
 #include "TSystem.h"
 #include "TStopwatch.h"
 #include <iostream>
+#include <filesystem>
 #include <map>
 #include <vector>
 #include <stdexcept>
@@ -33,8 +34,6 @@ std::map<std::string, TH2F*> loadHists(const char* histFile) {
     return histList;
 }
 
-
-
 void printMemoryInfo() {
     ProcInfo_t procInfo;  // Declare a ProcInfo_t structure
     gSystem->GetProcInfo(&procInfo);  // Pass its pointer to GetProcInfo
@@ -49,12 +48,15 @@ const int shiftRange = 50; //mrad
 const int shiftStep  = 2;   //mrad
 const int stepZ      = 1000 + 350; //um
 int xMin, xMax, yMin, yMax, xBin, yBin;
+int nPlates;
 TString path;
 // TString path = "/Users/fabioali/cernbox"; //for local test
 
-void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin) {
+void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates) {
     if (data==0) {
-        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%05i", fragment);
+        *path = "/Users/fabioali/cernbox";
+        // *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%05i", fragment);
+        *nPlates = 60;
         *xMin = 284000;
         *xMax = 304000;
         *yMin = 79000;
@@ -62,6 +64,7 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
     }
     else if (data==1) {
         *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%05i", fragment);
+        *nPlates = 60;
         *xMin = 0;
         *xMax = 200000;
         *yMin = 0;
@@ -70,6 +73,7 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
     else if (data==2) {
         // *path = "/Users/fabioali/cernbox";
         *path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
+        *nPlates = 57;
         const int xLow = fragment / 18;
         const int yLow = fragment % 18;
         *xMin = xLow*10000 + 3000;
@@ -100,12 +104,12 @@ TH2F* matrixCells(TFile* f[9], int plate) {
     TH2F* hm = new TH2F(histName, histTitle, xBin, xMin, xMax, yBin, yMin, yMax);
     TH2F* h2;
     for (int i = 0; i < 9; i++) {
-        // std::cout << f[i] << std::endl;
         h2 = (TH2F*)f[i]->Get(histName);
         list->Add(h2);
+        h2->SetDirectory(0);
     }
     hm->Merge(list);
-    delete h2;
+    list->Delete();
     delete list;
     return hm;
 }
@@ -140,7 +144,7 @@ int main(int argc, char* argv[]) {
     int partition = std::atoi(argv[2]);
     int fragment = std::atoi(argv[3]);
 
-    setRange(data, &path, fragment, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin);
+    setRange(data, &path, fragment, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates);
     
     TH2::AddDirectory(false);
     TH2F* h2, *hCrop;
@@ -173,12 +177,14 @@ int main(int argc, char* argv[]) {
             combination++;
             if (combination < combStart || combination >= combEnd) continue;
 
-            TString outputName = TString::Format("%s/shift/histo_shifts_%i_%i.root", path.Data(), fragment, combination);
+            TString outputPath = TString::Format("%s/shift/%i", path.Data(), fragment);
+            if (!std::filesystem::exists(outputPath.Data())) std::filesystem::create_directory(outputPath.Data());
+            TString outputName = TString::Format("%s/histo_shifts_%i.root", outputPath.Data(), combination);
 	        TFile *outputFile = new TFile(outputName, "RECREATE");
             std::cout << "Combination " << combination << std::endl;
 
             hComb->Reset();
-            for (int layer = 0; layer < 57; ++layer) {
+            for (int layer = 0; layer < nPlates; ++layer) {
                 int plate = layer + 1;
                 double shiftX = shiftTX / 1000.0 * stepZ * layer;
                 double shiftY = shiftTY / 1000.0 * stepZ * layer;
@@ -187,7 +193,7 @@ int main(int argc, char* argv[]) {
                 TString histTitle = TString::Format("XYPseg_%d", plate);
 
                 if (data == 0) {
-                    h3->GetZaxis()->SetRange(plate,plate);
+                    h3->GetZaxis()->SetRange(layer,layer);
                     h2 = (TH2F*)(h3->Project3D("yx"));
                     h2->SetNameTitle(histName.Data(), histTitle);
                 }
@@ -207,6 +213,7 @@ int main(int argc, char* argv[]) {
             }
             outputFile->cd();
             hComb->Write();
+            outputFile->Write();
             outputFile->Close();
             delete outputFile;
             std::cout << "Time: " << stopWatch.RealTime() << std::endl;
