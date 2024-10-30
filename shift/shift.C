@@ -52,10 +52,24 @@ int nPlates;
 TString path;
 // TString path = "/Users/fabioali/cernbox"; //for local test
 
+int getBrick(int brick) {
+    int bricks1[] = {11, 21, 31, 41, 51};
+    int bricks2[] = {12, 22, 32, 42, 52};
+    int bricks3[] = {13, 23, 33, 43, 53};
+    int bricks4[] = {14, 24, 34, 44, 54};
+    for (int i = 0; i < 5; i++) {
+        if (brick == bricks1[i]) return 1;
+        else if (brick == bricks2[i]) return 2;
+        else if (brick == bricks3[i]) return 3;
+        else if (brick == bricks4[i]) return 4;
+    }
+    return 0;
+}
+
 void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates) {
     if (data==0) {
-        *path = "/Users/fabioali/cernbox";
-        // *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%05i", fragment);
+        // *path = "/Users/fabioali/cernbox";
+        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%06i", fragment);
         *nPlates = 60;
         *xMin = 284000;
         *xMax = 304000;
@@ -63,12 +77,29 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
         *yMax = 99000;
     }
     else if (data==1) {
-        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%05i", fragment);
+        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%06i", fragment);
         *nPlates = 60;
-        *xMin = 0;
-        *xMax = 200000;
-        *yMin = 0;
-        *yMax = 200000;
+        int group = getBrick(fragment);
+        switch (group) {
+            case 1:
+                *xMin = 200000;
+                *yMin = 0;
+                break;
+            case 2:
+                *xMin = 0;
+                *yMin = 0;
+                break;
+            case 3:
+                *xMin = 200000;
+                *yMin = 200000;
+                break;
+            case 4:
+                *xMin = 0;
+                *yMin = 200000;
+                break;
+        }
+        *xMax = *xMin + 200000;
+        *yMax = *yMin + 200000;
     }
     else if (data==2) {
         // *path = "/Users/fabioali/cernbox";
@@ -76,10 +107,10 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
         *nPlates = 57;
         const int xLow = fragment / 18;
         const int yLow = fragment % 18;
-        *xMin = xLow*10000 + 3000;
-        *xMax = xLow*10000 + 17000;
-        *yMin = yLow*10000 + 3000;
-        *yMax = yLow*10000 + 17000;
+        *xMin = xLow*10000 + 1000;
+        *xMax = xLow*10000 + 19000;
+        *yMin = yLow*10000 + 1000;
+        *yMax = yLow*10000 + 19000;
     }
     *xBin = int((*xMax - *xMin) / binSize);
     *yBin = int((*yMax - *yMin) / binSize);
@@ -145,7 +176,6 @@ int main(int argc, char* argv[]) {
     int fragment = std::atoi(argv[3]);
 
     setRange(data, &path, fragment, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates);
-    
     TH2::AddDirectory(false);
     TH2F* h2, *hCrop;
     TH3F* h3;
@@ -229,59 +259,3 @@ int main(int argc, char* argv[]) {
     }
     return 0;
 }
-
-
-// #include <stdio.h>
-
-// // Function to determine the group of the brick
-// int getBrickGroup(int brick) {
-//     int bricks1[] = {11, 21, 31, 41, 51};
-//     int bricks2[] = {12, 22, 32, 42, 52};
-//     int bricks3[] = {13, 23, 33, 43, 53};
-//     int bricks4[] = {14, 24, 34, 44, 54};
-    
-//     // Check if the brick belongs to any of the groups
-//     for (int i = 0; i < 5; i++) {
-//         if (brick == bricks1[i]) return 1;
-//         if (brick == bricks2[i]) return 2;
-//         if (brick == bricks3[i]) return 3;
-//         if (brick == bricks4[i]) return 4;
-//     }
-    
-//     return 0;  // Return 0 if brick is not found
-// }
-
-// int main() {
-//     int brick = 31;  // Example brick
-//     int offsetx = 0;
-//     int offsety = 0;
-    
-//     // Get the group of the brick
-//     int group = getBrickGroup(brick);
-
-//     // Switch based on the group number
-//     switch (group) {
-//         case 1:
-//             offsetx = 200000;
-//             offsety = 0;
-//             break;
-//         case 2:
-//             offsetx = 0;
-//             offsety = 0;
-//             break;
-//         case 3:
-//             offsetx = 200000;
-//             offsety = 200000;
-//             break;
-//         case 4:
-//             offsetx = 0;
-//             offsety = 200000;
-//             break;
-//         default:
-//             printf("Brick not found in any group\n");
-//             return 1;  // Exit with error code
-//     }
-    
-//     printf("OffsetX: %d, OffsetY: %d\n", offsetx, offsety);
-//     return 0;
-// }
