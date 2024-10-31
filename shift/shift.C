@@ -102,11 +102,11 @@ void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin
         *yMax = *yMin + 200000;
     }
     else if (data==2) {
-        // *path = "/Users/fabioali/cernbox";
-        *path = "/eos/experiment/sndlhc/users/falicant/RUN1/b121/hist";
+        *path = "/Users/fabioali/cernbox/test_shift";
+        // *path = "/eos/experiment/sndlhc/users/falicant/RUN1/b121/hist";
         *nPlates = 57;
-        const int xLow = cell / 18;
-        const int yLow = cell % 18;
+        const int xLow = cell % 18;
+        const int yLow = cell / 18;
         *xMin = xLow*10000 + 1000;
         *xMax = xLow*10000 + 19000;
         *yMin = yLow*10000 + 1000;
@@ -196,8 +196,8 @@ int main(int argc, char* argv[]) {
     }
 
     int combination = 0;
-    int combStart = partition * 1000;
-    int combEnd = combStart + 1000;
+    int combStart = partition * 867;
+    int combEnd = combStart + 867;
 
     TStopwatch stopWatch;
     stopWatch.Start();
