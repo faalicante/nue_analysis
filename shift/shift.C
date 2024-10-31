@@ -66,10 +66,10 @@ int getBrick(int brick) {
     return 0;
 }
 
-void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates) {
+void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates) {
     if (data==0) {
         // *path = "/Users/fabioali/cernbox";
-        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%06i", fragment);
+        *path = TString::Format("/eos/experiment/sndlhc/users/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%06i", cell);
         *nPlates = 60;
         *xMin = 284000;
         *xMax = 304000;
@@ -77,9 +77,9 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
         *yMax = 99000;
     }
     else if (data==1) {
-        *path = TString::Format("/eos/user/f/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%06i", fragment);
+        *path = TString::Format("/eos/experiment/sndlhc/users/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%06i", cell);
         *nPlates = 60;
-        int group = getBrick(fragment);
+        int group = getBrick(cell);
         switch (group) {
             case 1:
                 *xMin = 200000;
@@ -103,10 +103,10 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
     }
     else if (data==2) {
         // *path = "/Users/fabioali/cernbox";
-        *path = "/eos/user/f/falicant/nue_search/R1B121/gen1/hist";
+        *path = "/eos/experiment/sndlhc/users/falicant/RUN1/b121/hist";
         *nPlates = 57;
-        const int xLow = fragment / 18;
-        const int yLow = fragment % 18;
+        const int xLow = cell / 18;
+        const int yLow = cell % 18;
         *xMin = xLow*10000 + 1000;
         *xMax = xLow*10000 + 19000;
         *yMin = yLow*10000 + 1000;
@@ -116,9 +116,9 @@ void setRange(int data, TString* path, int fragment, int* xMin, int* xMax, int* 
     *yBin = int((*yMax - *yMin) / binSize);
 }
 
-void openFiles(int fragment, TFile* f[9]) {
+void openFiles(int cell, TFile* f[9]) {
     int idx = 0;
-    for (int yCell = fragment-18; yCell <= fragment+18; yCell +=18) {
+    for (int yCell = cell-18; yCell <= cell+18; yCell +=18) {
         for (int xCell = yCell-1; xCell <= yCell+1; xCell++) {
             if (xCell < 0) continue;
             TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path.Data(), xCell);
@@ -166,16 +166,16 @@ TH2F* cropHist(TH2F* h2, double shiftX, double shiftY) {
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <partition>" << argv[2] << " <fragment>" << argv[3] << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <partition>" << argv[2] << " <cell>" << argv[3] << std::endl;
         // data = {0: muon, 1: nue, 2: data}
-        // fragment for MC is brick
+        // cell for MC is brick
         return 1;
     }
     int data = std::atoi(argv[1]);
     int partition = std::atoi(argv[2]);
-    int fragment = std::atoi(argv[3]);
+    int cell = std::atoi(argv[3]);
 
-    setRange(data, &path, fragment, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates);
+    setRange(data, &path, cell, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates);
     TH2::AddDirectory(false);
     TH2F* h2, *hCrop;
     TH3F* h3;
@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
         f = TFile::Open(fileName);
     }
     else if (data==2) {
-        openFiles(fragment, &ff[0]);
+        openFiles(cell, &ff[0]);
     }
 
     int combination = 0;
@@ -207,7 +207,7 @@ int main(int argc, char* argv[]) {
             combination++;
             if (combination < combStart || combination >= combEnd) continue;
 
-            TString outputPath = TString::Format("%s/shift/%i", path.Data(), fragment);
+            TString outputPath = TString::Format("%s/../shift/%i", path.Data(), cell);
             if (!std::filesystem::exists(outputPath.Data())) std::filesystem::create_directory(outputPath.Data());
             TString outputName = TString::Format("%s/histo_shifts_%i.root", outputPath.Data(), combination);
 	        TFile *outputFile = new TFile(outputName, "RECREATE");
