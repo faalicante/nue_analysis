@@ -69,7 +69,7 @@ int getBrick(int brick) {
 void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates) {
     if (data==0) {
         // *path = "/Users/fabioali/cernbox";
-        *path = TString::Format("/eos/experiment/sndlhc/users/falicant/Simulations_sndlhc/muon1E5_simsndlhc/b%06i", cell);
+        *path = TString::Format("/eos/experiment/sndlhc/users/falicant/simulations/muon1E5_simsndlhc/b%06i", cell);
         *nPlates = 60;
         *xMin = 284000;
         *xMax = 304000;
@@ -102,8 +102,8 @@ void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin
         *yMax = *yMin + 200000;
     }
     else if (data==2) {
-        *path = "/Users/fabioali/cernbox/test_shift";
-        // *path = "/eos/experiment/sndlhc/users/falicant/RUN1/b121/hist";
+        // *path = "/Users/fabioali/cernbox/test_shift";
+        *path = "/eos/experiment/sndlhc/users/falicant/RUN1/b121/hist";
         *nPlates = 57;
         const int xLow = cell % 18;
         const int yLow = cell / 18;
