@@ -26,10 +26,10 @@ ymaxcell = emulsioncell.Y(iy)+emulsioncell.Ybin()/2
 bin_size = 50
 xbin = int((xmaxcell-xmincell)/bin_size)
 ybin = int((ymaxcell-ymincell)/bin_size)
-overlap_fraction = 0.7
+overlap_fraction = 0.6
 
 hXYs = {}
-rootfile = ROOT.TFile(f"hist_XYP_b{brick}_{ix}_{iy}.root","RECREATE")
+rootfile = ROOT.TFile(f"hist_XY_b{brick}_{cell}.root","RECREATE")
 hXY = ROOT.TH2D(f"XYseg",f"XYseg;x[#mum];y[#mum]", xbin, xmincell, xmaxcell, ybin, ymincell, ymaxcell)
 ntuple = ROOT.TNtuple("segments","Ntuple of segments","p:x:y:tx:ty:theta")
 
@@ -74,7 +74,7 @@ for i in range(npl):
   
   # nseg = ect.eTree.GetEntries()
   
-  hXYs[nplate] = ROOT.TH2D(f"XYseg_{nplate}",f"XYPseg_{nplate};x[#mum];y[#mum]", xbin, xmincell, xmaxcell, ybin, ymincell, ymaxcell)
+  hXYs[nplate] = ROOT.TH2D(f"XYseg_{nplate}",f"XYseg_{nplate};x[#mum];y[#mum]", xbin, xmincell, xmaxcell, ybin, ymincell, ymaxcell)
   for ientry in range(nsegcut):
     iseg = cutlist.GetEntry(ientry)
     ect.GetEntry(iseg)

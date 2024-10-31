@@ -130,9 +130,8 @@ void openFiles(int cell, TFile* f[9]) {
 
 TH2F* matrixCells(TFile* f[9], int plate) {
     TString histName = TString::Format("XYseg_%d", plate);
-    TString histTitle = TString::Format("XYPseg_%d", plate);
     TList *list = new TList;
-    TH2F* hm = new TH2F(histName, histTitle, xBin, xMin, xMax, yBin, yMin, yMax);
+    TH2F* hm = new TH2F(histName, histName, xBin, xMin, xMax, yBin, yMin, yMax);
     TH2F* h2;
     for (int i = 0; i < 9; i++) {
         h2 = (TH2F*)f[i]->Get(histName);
@@ -183,7 +182,7 @@ int main(int argc, char* argv[]) {
     TFile* f, *ff[9];
 
     if (data==0) {
-        TString fileName = TString::Format("%s/hist_XYP_muon.root", path.Data());
+        TString fileName = TString::Format("%s/hist_XY_muon.root", path.Data());
         f = TFile::Open(fileName);
         h3 = (TH3F*)(f->Get("XYPseg"));
     }
@@ -220,14 +219,8 @@ int main(int argc, char* argv[]) {
                 double shiftY = shiftTY / 1000.0 * stepZ * layer;
 
                 TString histName = TString::Format("XYseg_%d", plate);
-                TString histTitle = TString::Format("XYPseg_%d", plate);
 
-                if (data == 0) {
-                    h3->GetZaxis()->SetRange(layer,layer);
-                    h2 = (TH2F*)(h3->Project3D("yx"));
-                    h2->SetNameTitle(histName.Data(), histTitle);
-                }
-                else if (data==1) {
+                if (data ==0 || data==1) {
                     h2 = (TH2F*)(f->Get(histName.Data()));
                 }
                 else if (data==2) {
