@@ -251,7 +251,7 @@ int main(int argc, char* argv[]) {
     if (data!=2) f->Close();
     else {
         for (int i = 0; i < 9; i++) {
-            ff[i]->Close();
+            if (ff[i] != nullptr) ff[i]->Close();
         }
     }
     return 0;
