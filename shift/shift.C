@@ -120,9 +120,11 @@ void openFiles(int cell, TFile* f[9]) {
     int idx = 0;
     for (int yCell = cell-18; yCell <= cell+18; yCell +=18) {
         for (int xCell = yCell-1; xCell <= yCell+1; xCell++) {
-            if (xCell < 0) continue;
-            TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path.Data(), xCell);
-            f[idx] = TFile::Open(histFile);
+            if (xCell < 0 || xCell > 323) f[idx] = nullptr;
+            else {
+                TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path.Data(), xCell);
+                f[idx] = TFile::Open(histFile);
+            }
             idx++;   
         }
     }
@@ -134,9 +136,11 @@ TH2F* matrixCells(TFile* f[9], int plate) {
     TH2F* hm = new TH2F(histName, histName, xBin, xMin, xMax, yBin, yMin, yMax);
     TH2F* h2;
     for (int i = 0; i < 9; i++) {
-        h2 = (TH2F*)f[i]->Get(histName);
-        list->Add(h2);
-        h2->SetDirectory(0);
+        if (f[i] != nullptr) {
+            h2 = (TH2F*)f[i]->Get(histName);
+            list->Add(h2);
+            h2->SetDirectory(0);
+        }
     }
     hm->Merge(list);
     list->Delete();
