@@ -177,21 +177,21 @@ int main(int argc, char* argv[]) {
   TH2F *h2 = (TH2F *)(f->Get("XYseg"));
   h2->Smooth();
   TCanvas *c = new TCanvas("c", "c", 800, 800);
-  c->SetGrid();
-  gStyle->SetOptStat(0);
+  // c->SetGrid();
+  // gStyle->SetOptStat(0);
   h2->Draw("colz");
-  c->Update();
-  c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
+  // c->Update();
+  // c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
   TObjArray peaks;
   TObjArray txt;
   int ranks[ntag];
   get_peaks(*h2,peaks,txt,ntag,ranks,bkg);
   h2->GetZaxis()->SetRangeUser(bkg, ranks[0]);
-  c->Update();
-  c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
+  // c->Update();
+  // c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
   drawEllipse(peaks,txt, kBlack);
-  c->Update();
-  c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
+  // c->Update();
+  // c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
 
   
   TH1F *h_long[ntag];
@@ -208,10 +208,10 @@ int main(int argc, char* argv[]) {
 
     drawEllipse(peaks,txt, kBlack);
     count_bins(ntag, *h, peaks, p, &h_long[0], data);
-    c->Update();
-    c->Print(Form("%s/tag/sh_%i.gif+12", path.Data(), combination));
+    // c->Update();
+    // c->Print(Form("%s/tag/sh_%i.gif+12", path.Data(), combination));
   }
-  c->Print(Form("%s/tag/sh_%i.gif++", path.Data(), combination));
+  // c->Print(Form("%s/tag/sh_%i.gif++", path.Data(), combination));
 
   makeNtuple(combination, ntag, &h_long[0], peaks,ranks);
 
