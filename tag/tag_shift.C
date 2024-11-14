@@ -74,7 +74,7 @@ void drawEllipse(TObjArray &peaks, TObjArray &txt, int col) {
   }
 }
 
-void getEntriesInEllipse(TH2F &h2, TEllipse &el, float *entries, float *bkg) {
+void getEntriesInEllipse(TH2F &h2, TEllipse &el, float *entries) {
   int nBinsX = h2.GetNbinsX();
   int nBinsY = h2.GetNbinsY();
   float x0 = el.GetX1();
@@ -89,7 +89,7 @@ void getEntriesInEllipse(TH2F &h2, TEllipse &el, float *entries, float *bkg) {
       float distance = (pow(x-x0,2)+pow(y-y0,2))/pow(r1,2);
       if (distance <= 1) {
         int binContent = h2.GetBinContent(i, j);
-        *entries = *entries + binContent - *bkg;
+        *entries = *entries + binContent;
         }
       }
     }
@@ -100,12 +100,11 @@ void getEntriesInEllipse(TH2F &h2, TEllipse &el, float *entries, float *bkg) {
 
 void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F **h_long, int data) {
   int np = peaks.GetEntries();
-  float bkg = 0;
   float entries;
 
   for(int i=0; i<np; i++) {
     TEllipse *el = ((TEllipse*)(peaks.At(i)));
-    getEntriesInEllipse(h2, *el, &entries, &bkg);
+    getEntriesInEllipse(h2, *el, &entries);
     if (entries<0) entries = 0;
     h_long[i]->SetBinContent(plate, entries);
   }
