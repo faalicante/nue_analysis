@@ -56,7 +56,7 @@ hmap = ROOT.TH2D("hmap", "hmap;x;y", nxbins, xOffset, xOffset+xRange, nxbins, yO
 hTmap = ROOT.TH2D("hTmap", "hTmap;TX;TY", nbins, -shiftRange, shiftRange, nbins, -shiftRange, shiftRange)
 map = {}
 for entry in showers:
-    combination = int(entry.combination) 
+    combination = int(entry.combination) - 1
     # if entry.x<xOffset+2*xStep or entry.x>xOffset+xRange-2*xStep or entry.y<yOffset+2*xStep or entry.y>yOffset+xRange-2*xStep or (abs(entry.x-124750)<300 and abs(entry.y-52500)<1000): continue
     if entry.x<xOffset+2*xStep or entry.x>xOffset+xRange-2*xStep or entry.y<yOffset+2*xStep or entry.y>yOffset+xRange-2*xStep: continue
     nseg = int(entry.nseg)
@@ -74,11 +74,12 @@ for entry in showers:
         hmap.SetBinContent(Xbin, Ybin, peak)
         map[(Xbin, Ybin)] = combination
 
-# c = ROOT.TCanvas("c","c",1100,600)
-# c.Divide(2,1)
-# c.cd(1)
+c = ROOT.TCanvas("c","c",1100,600)
+c.Divide(2,1)
+c.cd(1)
+hmap.Draw("colz")
 xyPeaks = makeMap(hmap)
-# hmap.Draw("colz")
+c.cd(1).Update()
 # print(map)
 for peak in xyPeaks:
     binPeak = hmap.FindBin(peak.GetX(), peak.GetY())
@@ -88,22 +89,22 @@ for peak in xyPeaks:
     combination = map[(Xbin, Ybin)]
     ix = combination // nbins + 1 
     iy = combination % nbins + 1
-    tx = ix - 25
-    ty = iy - 25
+    tx = combination // nbins*2 - 50
+    ty = combination % nbins*2 - 50
     # if ROOT.TMath.Sqrt((ix-26)**2+(iy-26)**2)<5: continue
 
     Tbin = hTmap.GetBin(ix,iy)
 
     nseg = hmap.GetBinContent(binPeak)
+    ntuple.Fill(peak.GetX(), peak.GetY(), combination, tx, ty, nseg)
     if nseg > hTmap.GetBinContent(Tbin):
         hTmap.SetBinContent(Tbin, nseg)
-        ntuple.Fill(peak.GetX(), peak.GetY(), combination, tx, ty, peak)
 
-# c.cd(2)
-# hTmap.Draw("colz")
-# c.Draw()
-# c.Update()
+c.cd(2)
+hTmap.Draw("colz")
+c.Draw()
 rootfile.cd()
 ntuple.Write()
-hmap.Write()
-hTmap.Write()
+c.Write()
+rootfile.Write()
+rootfile.Close()
