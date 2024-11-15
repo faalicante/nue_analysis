@@ -22,8 +22,8 @@ void setPath(int data, TString* path, int cell, int* nPlates) {
         *nPlates = 60;
     }
     else if (data==2) {
-        // *path = TString("/Users/fabioali/cernbox");
-        *path = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/%i", cell);
+        *path = TString("/Users/fabioali/cernbox");
+        // *path = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/%i", cell);
         *nPlates = 57;
     }
 }
@@ -119,19 +119,19 @@ void makePlots(int combination, TCanvas *c, int np, int npmax, TH1F *h_long, int
   h_long->SetLineColor(1);
   h_long->SetLineWidth(2);
   h_long->Draw("hist");
-  if(np == 2)                 c->Print(Form("%s/tag/longitudinal_xz_%i.pdf(", path.Data(), combination), "pdf");
-  else if(np == npmax-1)      c->Print(Form("%s/tag/longitudinal_xz_%i.pdf)", path.Data(), combination), "pdf");
-  else if(idx == 3 && np >2 ) c->Print(Form("%s/tag/longitudinal_xz_%i.pdf", path.Data(), combination), "pdf");
+  if(np == 2)                 c->Print(Form("%s/longitudinal_xz_%i.pdf(", path.Data(), combination), "pdf");
+  else if(np == npmax-1)      c->Print(Form("%s/longitudinal_xz_%i.pdf)", path.Data(), combination), "pdf");
+  else if(idx == 3 && np >2 ) c->Print(Form("%s/longitudinal_xz_%i.pdf", path.Data(), combination), "pdf");
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { //add second axis?
   float entries = h_long->Integral();
-  *firstPlate = h_long->FindFirstBinAbove(0.01 * entries);
-  *lastPlate = h_long->FindLastBinAbove(0.01 * entries);
+  *firstPlate = h_long->FindFirstBinAbove(800);
+  *lastPlate = h_long->FindLastBinAbove(800);
 }
 
 void makeNtuple(int combination, int np, TH1F **h_long, TObjArray &peaks, int *ranks) {
-  TString outputFileName = TString::Format("%s/tag/peaks_shift_%d.root", path.Data(), combination);
+  TString outputFileName = TString::Format("%s/peaks_shift_%d.root", path.Data(), combination);
   TFile *outputFile = new TFile(outputFileName, "RECREATE");
   TNtuple *ntuple = new TNtuple("showers","tagged showers","combination:tag:x:y:start:end:peak:maxplate:nseg:rankbin");
   TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
@@ -181,17 +181,17 @@ int main(int argc, char* argv[]) {
   // gStyle->SetOptStat(0);
   h2->Draw("colz");
   // c->Update();
-  // c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
+  // c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));
   TObjArray peaks;
   TObjArray txt;
   int ranks[ntag];
   get_peaks(*h2,peaks,txt,ntag,ranks,bkg);
   h2->GetZaxis()->SetRangeUser(bkg, ranks[0]);
   // c->Update();
-  // c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
+  // c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));
   drawEllipse(peaks,txt, kBlack);
   // c->Update();
-  // c->Print(Form("%s/tag/sh_%i.gif+180", path.Data(), combination));
+  // c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));
 
   
   TH1F *h_long[ntag];
@@ -209,9 +209,9 @@ int main(int argc, char* argv[]) {
     drawEllipse(peaks,txt, kBlack);
     count_bins(ntag, *h, peaks, p, &h_long[0], data);
     // c->Update();
-    // c->Print(Form("%s/tag/sh_%i.gif+12", path.Data(), combination));
+    // c->Print(Form("%s/sh_%i.gif+12", path.Data(), combination));
   }
-  // c->Print(Form("%s/tag/sh_%i.gif++", path.Data(), combination));
+  // c->Print(Form("%s/sh_%i.gif++", path.Data(), combination));
 
   makeNtuple(combination, ntag, &h_long[0], peaks,ranks);
 
