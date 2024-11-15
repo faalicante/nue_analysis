@@ -47,8 +47,9 @@ path = f'/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/{cell}/tag'
 rootfile = ROOT.TFile(path+f"/shift_map.root","RECREATE")
 ntuple = ROOT.TNtuple("map", "Tree of couples","x:y:combination:tx:ty:peak")
 # File
-path = '/Users/fabioali/cernbox/peaks_shift_149.root'
-file = ROOT.TFile.Open(path)
+# peakfile = '/Users/fabioali/cernbox/peaks_shift_149.root'
+peakfile = path+'/peaks_shift.root'
+file = ROOT.TFile.Open(peakfile)
 showers = file.Get("showers")
 
 hmap = ROOT.TH2D("hmap", "hmap;x;y", nxbins, xOffset, xOffset+xRange, nxbins, yOffset, yOffset+xRange)
@@ -93,9 +94,9 @@ for peak in xyPeaks:
 
     Tbin = hTmap.GetBin(ix,iy)
 
-    peak = hmap.GetBinContent(binPeak)
-    if peak > hTmap.GetBinContent(Tbin):
-        hTmap.SetBinContent(Tbin, peak)
+    nseg = hmap.GetBinContent(binPeak)
+    if nseg > hTmap.GetBinContent(Tbin):
+        hTmap.SetBinContent(Tbin, nseg)
         ntuple.Fill(peak.GetX(), peak.GetY(), combination, tx, ty, peak)
 
 # c.cd(2)
