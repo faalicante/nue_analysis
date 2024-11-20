@@ -9,7 +9,6 @@ void eval_bkg(int cell, float x0, float y0) {
     TString fname = TString::Format("%s/hist_XYP_b121_%i.root", path.Data(), cell);
     TFile* f = TFile::Open(fname);
     TH2F *h2 = (TH2F *)(f->Get("XYseg"));
-    
     TFile *file = new TFile("bkg_b121.root", "UPDATE");
     TTree *tree = (TTree*)file->Get("bkg");
     
@@ -35,6 +34,7 @@ void eval_bkg(int cell, float x0, float y0) {
     int xbin = h2->GetXaxis()->FindBin(x0);
     int ybin = h2->GetYaxis()->FindBin(y0);
 
+    h2->Smooth();
     for (int ix = xbin-r0; ix < xbin+r0; ++ix) {
         for (int iy = ybin-r0; iy < ybin+r0; ++iy) {
             float x1 = h2->GetXaxis()->GetBinLowEdge(ix);
