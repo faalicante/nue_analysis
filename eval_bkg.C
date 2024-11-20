@@ -28,7 +28,7 @@ void eval_bkg(int cell, float x0, float y0) {
         tree->SetBranchAddress("b", &b);
     }
 
-    int r0 = (int)(500./50);
+    int r0 = (int)(250./50);
     x0 = x0 * 1000;
     y0 = y0 * 1000;
     int xbin = h2->GetXaxis()->FindBin(x0);
