@@ -20,13 +20,14 @@ if nue:
     output_file = ROOT.TFile.Open(nue_path+"/nue_showers.root","RECREATE")
 else:
     file = ROOT.TFile.Open(muon_file)
-    output_file = ROOT.TFile.Open(nue_path+"/../muon1E5_simsndlhc/muon_showers.root","RECREATE")
+    output_file = ROOT.TFile.Open("/eos/experiment/sndlhc/users/falicant/simulations/muon1E5_simsndlhc/muon_showers.root","RECREATE")
 cbmsim = file.cbmsim
 tree = ROOT.TTree("cbmsim","shower event")
 
 N = 100000
 _brick = array('i', [0])
 _event = array('i', [0])
+_energy = array('f', [0])
 _count = array('i', [0])
 _nHits = array('i', [0])
 _ex = array('f', [0])
@@ -43,6 +44,7 @@ _ty = array('f', N*[0])
 _dist = array('f', N*[0])
 tree.Branch("brick", _brick, "brick/I")
 tree.Branch("event", _event, "event/I")
+tree.Branch("energy", _energy, "energy/F")
 tree.Branch("count", _count, "count/I")
 tree.Branch("nHits", _nHits, "nHits/I")
 tree.Branch("ex", _ex, "ex/F")
@@ -71,6 +73,7 @@ for ievt in range(cbmsim.GetEntries()):
     etx = cbmsim.MCTrack[1].GetPx()/cbmsim.MCTrack[1].GetPz()
     ety = cbmsim.MCTrack[1].GetPy()/cbmsim.MCTrack[1].GetPz()
     ett = cbmsim.MCTrack[1].GetPt()/cbmsim.MCTrack[1].GetPz()
+    energy = cbmsim.MCTrack[0].GetEnergy()
 
     for eHit in cbmsim.EmulsionDetPoint:
         trackID = eHit.GetTrackID()
@@ -100,6 +103,7 @@ for ievt in range(cbmsim.GetEntries()):
     if count>0:
         _brick[0] = brickID
         _event[0] = ievt
+        _energy[0] = energy
         _count[0] = count
         _nHits[0] = nHits
         _ex[0] = ex
