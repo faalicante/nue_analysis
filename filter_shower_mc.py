@@ -67,13 +67,26 @@ for ievt in range(cbmsim.GetEntries()):
     count=0
     brick_el = {11: 0, 12: 0, 13: 0, 14: 0, 21: 0, 22: 0, 23: 0, 24: 0, 31: 0, 32: 0, 33: 0, 34: 0, 41: 0, 42: 0, 43: 0, 44: 0, 51: 0, 52: 0, 53: 0, 54: 0, }
     cbmsim.GetEntry(ievt)
-    ex = cbmsim.MCTrack[1].GetStartX()
-    ey = cbmsim.MCTrack[1].GetStartY()
-    ez = cbmsim.MCTrack[1].GetStartZ()
-    etx = cbmsim.MCTrack[1].GetPx()/cbmsim.MCTrack[1].GetPz()
-    ety = cbmsim.MCTrack[1].GetPy()/cbmsim.MCTrack[1].GetPz()
-    ett = cbmsim.MCTrack[1].GetPt()/cbmsim.MCTrack[1].GetPz()
-    energy = cbmsim.MCTrack[0].GetEnergy()
+    if nue:
+        ex = cbmsim.MCTrack[1].GetStartX()
+        ey = cbmsim.MCTrack[1].GetStartY()
+        ez = cbmsim.MCTrack[1].GetStartZ()
+        etx = cbmsim.MCTrack[1].GetPx()/cbmsim.MCTrack[1].GetPz()
+        ety = cbmsim.MCTrack[1].GetPy()/cbmsim.MCTrack[1].GetPz()
+        ett = cbmsim.MCTrack[1].GetPt()/cbmsim.MCTrack[1].GetPz()
+        energy = cbmsim.MCTrack[0].GetEnergy()
+    else:
+        ex = cbmsim.MCTrack[0].GetStartX()
+        ey = cbmsim.MCTrack[0].GetStartY()
+        ez = cbmsim.MCTrack[0].GetStartZ()
+        etx = cbmsim.MCTrack[0].GetPx()/cbmsim.MCTrack[0].GetPz()
+        ety = cbmsim.MCTrack[0].GetPy()/cbmsim.MCTrack[0].GetPz()
+        ett = cbmsim.MCTrack[0].GetPt()/cbmsim.MCTrack[0].GetPz()
+        energy=0
+        for trk in cbmsim.MCTrack:
+            if trk.GetPdgCode()==22 and trk.GetMotherId()==0 and trk.GetProcID()==8 and trk.GetEnergy() > energy:
+                energy = trk.GetEnergy()
+                
 
     for eHit in cbmsim.EmulsionDetPoint:
         trackID = eHit.GetTrackID()
@@ -90,7 +103,9 @@ for ievt in range(cbmsim.GetEntries()):
             pz = eHit.GetPz()
             tx = px/pz
             ty = py/pz
-            distance = ROOT.TMath.Sqrt((x-ex)**2+(y-ey)**2)
+            epx = ex+etx*(z-ez)
+            epy = ey+ety*(z-ez)
+            distance = ROOT.TMath.Sqrt((x-epx)**2+(y-epy)**2)
             _x[count] = x
             _y[count] = y
             _z[count] = z
@@ -109,6 +124,9 @@ for ievt in range(cbmsim.GetEntries()):
         _ex[0] = ex
         _ey[0] = ey
         _ez[0] = ez
+        _etx[0] = etx
+        _ety[0] = ety
+        _ett[0] = ett
         tree.Fill()
     # for track in cbmsim.MCTrack:
     #     x = track.GetStartX()
