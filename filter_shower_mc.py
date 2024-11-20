@@ -32,11 +32,15 @@ _nHits = array('i', [0])
 _ex = array('f', [0])
 _ey = array('f', [0])
 _ez = array('f', [0])
+_etx = array('f', [0])
+_ety = array('f', [0])
+_ett = array('f', [0])
 _x = array('f', N*[0])
 _y = array('f', N*[0])
 _z = array('f', N*[0])
 _tx = array('f', N*[0])
 _ty = array('f', N*[0])
+_dist = array('f', N*[0])
 tree.Branch("brick", _brick, "brick/I")
 tree.Branch("event", _event, "event/I")
 tree.Branch("count", _count, "count/I")
@@ -44,11 +48,15 @@ tree.Branch("nHits", _nHits, "nHits/I")
 tree.Branch("ex", _ex, "ex/F")
 tree.Branch("ey", _ey, "ey/F")
 tree.Branch("ez", _ey, "ey/F")
+tree.Branch("etx", _etx, "etx/F")
+tree.Branch("ety", _ety, "ety/F")
+tree.Branch("ett", _ett, "ett/F")
 tree.Branch("x", _x, "x[count]/F")
 tree.Branch("y", _y, "y[count]/F")
 tree.Branch("z", _z, "z[count]/F")
 tree.Branch("tx", _tx, "tx[count]/F")
 tree.Branch("ty", _ty, "ty[count]/F")
+tree.Branch("dist", _dist, "dist[count]/F")
 
 bar = progressbar.ProgressBar(maxval=cbmsim.GetEntries(), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
 bar.start()
@@ -57,14 +65,17 @@ for ievt in range(cbmsim.GetEntries()):
     count=0
     brick_el = {11: 0, 12: 0, 13: 0, 14: 0, 21: 0, 22: 0, 23: 0, 24: 0, 31: 0, 32: 0, 33: 0, 34: 0, 41: 0, 42: 0, 43: 0, 44: 0, 51: 0, 52: 0, 53: 0, 54: 0, }
     cbmsim.GetEntry(ievt)
+    ex = cbmsim.MCTrack[1].GetStartX()
+    ey = cbmsim.MCTrack[1].GetStartY()
+    ez = cbmsim.MCTrack[1].GetStartZ()
+    etx = cbmsim.MCTrack[1].GetPx()/cbmsim.MCTrack[1].GetPz()
+    ety = cbmsim.MCTrack[1].GetPy()/cbmsim.MCTrack[1].GetPz()
+    ett = cbmsim.MCTrack[1].GetPt()/cbmsim.MCTrack[1].GetPz()
 
     for eHit in cbmsim.EmulsionDetPoint:
         trackID = eHit.GetTrackID()
         if trackID < 0: continue
-        ex = cbmsim.MCTrack[1].GetStartX()
-        ey = cbmsim.MCTrack[1].GetStartY()
-        ez = cbmsim.MCTrack[1].GetStartZ()
-        if cbmsim.MCTrack[trackID].GetProcID()==5 and cbmsim.MCTrack[trackID].GetEnergy() >= 0.1:
+        if cbmsim.MCTrack[trackID].GetProcID()==5 and abs(cbmsim.MCTrack[trackID].GetPdgCode()==11) and cbmsim.MCTrack[trackID].GetEnergy() >= 0.1:
             detID = eHit.GetDetectorID()
             brickDet = DecodeBrickID(detID)
             brick_el[brickDet] += 1
@@ -76,11 +87,13 @@ for ievt in range(cbmsim.GetEntries()):
             pz = eHit.GetPz()
             tx = px/pz
             ty = py/pz
+            distance = ROOT.TMath.Sqrt((x-ex)**2+(y-ey)**2)
             _x[count] = x
             _y[count] = y
             _z[count] = z
             _tx[count] = tx
             _ty[count] = ty
+            _dist[count] = distance
             count+=1
     brickID = max(brick_el, key=brick_el.get)
     nHits = max(brick_el.values())
