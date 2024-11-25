@@ -33,8 +33,8 @@ const int shiftStep  = 2;    //mrad
 const int stepZ      = 1350; //um
 const int radius     = 300;  //um
 const int ntag = 10;
-const int bkg = 500;
-int xMin, xMax, yMin, yMax, xBin, yBin;
+const int bkg = 410;
+int xMin, xMax, yMin, yMax, xBin, yBin, xLow, yLow;
 int nPlates;
 TString path;
 
@@ -52,7 +52,7 @@ int getBrick(int brick) {
     return 0;
 }
 
-void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates) {
+void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates, int* xLow, int* yLow) {
     if (data==0) {
         // *path = "/Users/fabioali/cernbox";
         *path = TString::Format("/eos/experiment/sndlhc/users/falicant/simulations/muon1E5_simsndlhc/b%06i", cell);
@@ -88,15 +88,15 @@ void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin
         *yMax = *yMin + 200000;
     }
     else if (data==2) {
-        *path = "/Users/fabioali/cernbox/test_shift";
-        // *path = "/eos/experiment/sndlhc/users/falicant/RUN1/b121/hist";
+        *path = "/Users/fabioali/cernbox/test_shift/trk";
+        *path = "/eos/experiment/sndlhc/emulsionData/2022/emureco_Napoli/RUN1/b000121/cells";
         *nPlates = 57;
-        const int xLow = cell % 18;
-        const int yLow = cell / 18;
-        *xMin = xLow*10000 + 1000;
-        *xMax = xLow*10000 + 19000;
-        *yMin = yLow*10000 + 1000;
-        *yMax = yLow*10000 + 19000;
+        *xLow = cell % 18;
+        *yLow = cell / 18;
+        *xMin = *xLow*10000 + 4000;
+        *xMax = *xLow*10000 + 16000;
+        *yMin = *yLow*10000 + 4000;
+        *yMax = *yLow*10000 + 16000;
     }
     *xBin = int((*xMax - *xMin) / binSize);
     *yBin = int((*yMax - *yMin) / binSize);
@@ -104,11 +104,12 @@ void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin
 
 void openFiles(int cell, TFile* f[9]) {
     int idx = 0;
-    for (int yCell = cell-18; yCell <= cell+18; yCell +=18) {
-        for (int xCell = yCell-1; xCell <= yCell+1; xCell++) {
-            if (xCell < 0 || xCell > 323) f[idx] = nullptr;
+    for (int yCell = yLow-1; yCell <= yLow+1; yCell ++) {
+        for (int xCell = xLow-1; xCell <= xLow+1; xCell++) {
+            if (xCell < 1 || xCell > 18 || yCell < 1 || yCell > 18) f[idx] = nullptr;
             else {
-                TString histFile = TString::Format("%s/hist_XYP_b121_%i.root", path.Data(), xCell);
+                TString histFile = TString::Format("%s/cell_%i0_%i0_1x1cm/b000021/b000021.0.0.0.trk.root", path.Data(), xCell+1, yCell+1);
+                std::cout << histFile << std::endl;
                 f[idx] = TFile::Open(histFile);
             }
             idx++;   
@@ -116,46 +117,45 @@ void openFiles(int cell, TFile* f[9]) {
     }
 }
 
-TH2F* matrixCells(TFile* f[9], int plate) {
+TH2F* projectHist(TFile* f, int plate) {
     TString histName = TString::Format("XYseg_%d", plate);
-    TList *list = new TList;
+    TH3F* h3 = (TH3F*)(f->Get("XYPseg"));
+    h3->GetZaxis()->SetRange(plate+1,plate+1);
+    TH2F* h2 = (TH2F*)(h3->Project3D("yx"));
+    return h2;
+}
+
+TH2F* matrixCells(TFile* f[9], int plate, double shiftX, double shiftY) {
+    TString histName = TString::Format("XYseg_%d", plate);
     TH2F* hm = new TH2F(histName, histName, xBin, xMin, xMax, yBin, yMin, yMax);
     TH2F* h2;
     for (int i = 0; i < 9; i++) {
-        if (f[i] != nullptr) {
-            h2 = (TH2F*)f[i]->Get(histName);
-            list->Add(h2);
-            h2->SetDirectory(0);
-        }
-    }
-    hm->Merge(list);
-    list->Delete();
-    delete list;
-    return hm;
-}
-
-TH2F* cropHist(TH2F* h2, double shiftX, double shiftY) {
-    TH2F* hCrop = new TH2F(h2->GetTitle(), h2->GetTitle(), xBin, xMin, xMax, yBin, yMin, yMax);
-    for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
-        double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
-        if (xCenter <= xMax && xCenter >= xMin) {
-            for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
-                double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-                if (yCenter <= yMax && yCenter >= yMin) {
-                    double content = h2->GetBinContent(xBin, yBin);
-                    int xBinNew = hCrop->GetXaxis()->FindBin(xCenter);
-                    int yBinNew = hCrop->GetYaxis()->FindBin(yCenter);
-                    hCrop->SetBinContent(xBinNew, yBinNew, content);
+        if (f[i] == nullptr) continue;
+        h2 = projectHist(f[i], plate);
+        for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
+            double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
+            if (xCenter <= xMax && xCenter >= xMin) {
+                for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
+                    double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
+                    if (yCenter <= yMax && yCenter >= yMin) {
+                        double content = h2->GetBinContent(xBin, yBin);
+                        if (content) {
+                            int xBinNew = hm->GetXaxis()->FindBin(xCenter);
+                            int yBinNew = hm->GetYaxis()->FindBin(yCenter);
+                            if (content > hm->GetBinContent(xBinNew, yBinNew)) hm->SetBinContent(xBinNew, yBinNew, content);
+                        }
+                    }
                 }
             }
         }
+        delete h2;
     }
-    return hCrop;
+    return hm;
 }
 
-TH2F* stackHist(int data, int combination, int cell, TH2F **hCrop) {
+TH2F* stackHist(int data, int combination, int cell, TH2F **hm) {
     TFile* f, *ff[9];
-    // TH3F *h3;
+
     if (data==0) {
         TString fileName = TString::Format("%s/hist_XY_muon.root", path.Data());
         f = TFile::Open(fileName);
@@ -172,7 +172,7 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hCrop) {
     double shiftTX = (combination / (shiftRange+1)) * shiftStep - shiftRange;
     double shiftTY = (combination % (shiftRange+1)) * shiftStep - shiftRange;
     // std::cout << combination << " " << shiftRange+1 << " " << shiftStep << " " << shiftTX << " " << shiftTY << std::endl;
-    TH2F* h2;
+    // TH2F* h2;
     TH2F* hComb = new TH2F("XYseg", "XYseg", xBin, xMin, xMax, yBin, yMin, yMax);
     for (int layer = 0; layer < nPlates; ++layer) {
         int plate = layer + 1;
@@ -182,16 +182,18 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hCrop) {
 
         TString histName = TString::Format("XYseg_%d", plate);
         if (data ==0 || data==1) {
-            h2 = (TH2F*)(f->Get(histName.Data()));
+            TH2F *h2 = (TH2F*)(f->Get(histName.Data()));
+            hm[layer] = matrixCells(&ff[0], plate, shiftX, shiftY);
+
         }
         else if (data==2) {
-            h2 = matrixCells(&ff[0], plate);
+            // h2 = matrixCells(&ff[0], plate);
+
+            hm[layer] = matrixCells(&ff[0], plate, shiftX, shiftY);
         }
-        hCrop[layer] = cropHist(h2, shiftX, shiftY);
-        delete h2;
-        hComb->Add(hCrop[layer]);
+        // delete h2;
+        hComb->Add(hm[layer]);
     }
-    // delete h3;
     if (data!=2) f->Close();
     else {
         for (int i = 0; i < 9; i++) {
@@ -216,7 +218,6 @@ int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt, const int bkg) {
     t->SetTextSize(0.03);
     txt.Add(t);
     int r0=(int)round((double)radius/binSize);
-    std::cout << r0 << std::endl;
     for(int iix = ix-r0; iix<=ix+r0; iix++) {
       for(int iiy = iy-r0; iiy<=iy+r0; iiy++) {
         float distance = (pow(iix-ix,2)+pow(iiy-iy,2))/pow(r0,2);
@@ -248,24 +249,26 @@ void drawEllipse(TObjArray &peaks, TObjArray &txt, int col) {
 }
 
 void getEntriesInEllipse(TH2F &h2, TEllipse &el, int *entries, const int bkg) {
-  int nBinsX = h2.GetNbinsX();
-  int nBinsY = h2.GetNbinsY();
-  float x0 = el.GetX1();
-  float y0 = el.GetY1();
-  float r1 = el.GetR1();
-  *entries = 0;
+    int nBinsX = h2.GetNbinsX();
+    int nBinsY = h2.GetNbinsY();
+    float x0 = el.GetX1();
+    float y0 = el.GetY1();
+    float r1 = el.GetR1();
+    *entries = 0;
 
-  for (int i = 1; i <= nBinsX; ++i) {
-    for (int j = 1; j <= nBinsY; ++j) {
-      float x = h2.GetXaxis()->GetBinCenter(i);
-      float y = h2.GetYaxis()->GetBinCenter(j);
-      float distance = (pow(x-x0,2)+pow(y-y0,2))/pow(r1,2);
-      if (distance <= 1) {
-        int binContent = h2.GetBinContent(i, j);
-        if(binContent>(int)(double)bkg/nPlates) *entries = *entries + binContent;
-        }
-      }
-    }  
+    for (int i = 1; i <= nBinsX; ++i) {
+        for (int j = 1; j <= nBinsY; ++j) {
+            float x = h2.GetXaxis()->GetBinCenter(i);
+            float y = h2.GetYaxis()->GetBinCenter(j);
+            float distance = (pow(x-x0,2)+pow(y-y0,2))/pow(r1,2);
+            if (distance <= 1) {
+                int binContent = h2.GetBinContent(i, j);
+                if(binContent>= static_cast<int>(std::ceil((double)bkg/nPlates))) {
+                    *entries = *entries + binContent;
+                }
+            }
+        } 
+    }
 }
 
 void count_bins(TH2F *h2, TObjArray &peaks, int plate, TH1F **h_long, const int bkg) {
@@ -337,23 +340,23 @@ int main(int argc, char* argv[]) {
     TStopwatch stopWatch;
     stopWatch.Start();
 
-    setRange(data, &path, cell, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates);
+    setRange(data, &path, cell, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates, &xLow, &yLow);
     
     gStyle->SetOptStat(0);
     TH2::AddDirectory(false);
-    TH2F* hCrop[nPlates];
+    TH2F* hm[nPlates];
 
-    TString outputPath = TString::Format("%s/../shift/%i", path.Data(), cell);
+    TString outputPath = TString::Format("%s/%i", path.Data(), cell);
     if (!std::filesystem::exists(outputPath.Data())) std::filesystem::create_directory(outputPath.Data());
     TString outputName = TString::Format("%s/histo_shifts_%i.root", outputPath.Data(), combination);
     TFile *outputFile = new TFile(outputName, "RECREATE");
     std::cout << "Combination " << combination << std::endl;
     
-    TH2F* hComb = stackHist(data, combination, cell, &hCrop[0]);
+    TH2F* hComb = stackHist(data, combination, cell, &hm[0]);
  
     TCanvas *c = new TCanvas("c", "c", 800, 800);
     c->SetGrid();
-    hComb->Smooth();
+    // hComb->Smooth();
     hComb->Draw("colz");
     c->Update();
     c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));
@@ -375,11 +378,11 @@ int main(int argc, char* argv[]) {
 
     for(int p=1; p<=nPlates; p++) { 
         printf("Plate %i\n", p);
-        hCrop[p-1]->Smooth();
-        hCrop[p-1]->Draw("colz");
+        // hm[p-1]->Smooth();
+        hm[p-1]->Draw("colz");
         drawEllipse(peaks,txt, kBlack);
-        count_bins(hCrop[p-1], peaks, p, &h_long[0], bkg);
-        hCrop[p-1]->GetZaxis()->SetRangeUser((int)round((double)bkg/nPlates), hCrop[p-1]->GetMaximum());
+        count_bins(hm[p-1], peaks, p, &h_long[0], bkg);
+        // hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
         c->Update();
         c->Print(Form("%s/sh_%i.gif+12", path.Data(), combination));
     }
