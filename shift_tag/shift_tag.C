@@ -37,6 +37,8 @@ const int bkg = 410;
 int xMin, xMax, yMin, yMax, xBin, yBin, xLow, yLow;
 int nPlates;
 TString path;
+TString opath;
+
 
 int getBrick(int brick) {
     int bricks1[] = {11, 21, 31, 41, 51};
@@ -52,10 +54,11 @@ int getBrick(int brick) {
     return 0;
 }
 
-void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates, int* xLow, int* yLow) {
+void setRange(int data, TString* path, TString* opath, int cell, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates, int* xLow, int* yLow) {
     if (data==0) {
         // *path = "/Users/fabioali/cernbox";
         *path = TString::Format("/eos/experiment/sndlhc/users/falicant/simulations/muon1E5_simsndlhc/b%06i", cell);
+        *opath = *path;
         *nPlates = 60;
         *xMin = 284000;
         *xMax = 304000;
@@ -64,6 +67,7 @@ void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin
     }
     else if (data==1) {
         *path = TString::Format("/eos/experiment/sndlhc/users/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%06i", cell);
+        *opath = *path;
         *nPlates = 60;
         int group = getBrick(cell);
         switch (group) {
@@ -88,8 +92,9 @@ void setRange(int data, TString* path, int cell, int* xMin, int* xMax, int* yMin
         *yMax = *yMin + 200000;
     }
     else if (data==2) {
-        *path = "/Users/fabioali/cernbox/test_shift/trk";
+        // *path = "/Users/fabioali/cernbox/test_shift/trk";
         *path = "/eos/experiment/sndlhc/emulsionData/2022/emureco_Napoli/RUN1/b000121/cells";
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/trk/%i", cell);
         *nPlates = 57;
         *xLow = cell % 18;
         *yLow = cell / 18;
@@ -291,9 +296,9 @@ void makePlots(int combination, TCanvas *c, int np, int npmax, TH1F *h_long, int
   h_long->SetLineColor(1);
   h_long->SetLineWidth(2);
   h_long->Draw("hist");
-  if(np == 2)                 c->Print(Form("%s/longitudinal_xz_%i.pdf(", path.Data(), combination), "pdf");
-  else if(np == npmax-1)      c->Print(Form("%s/longitudinal_xz_%i.pdf)", path.Data(), combination), "pdf");
-  else if(idx == 3 && np >2 ) c->Print(Form("%s/longitudinal_xz_%i.pdf", path.Data(), combination), "pdf");
+  if(np == 2)                 c->Print(Form("%s/longitudinal_xz_%i.pdf(", opath.Data(), combination), "pdf");
+  else if(np == npmax-1)      c->Print(Form("%s/longitudinal_xz_%i.pdf)", opath.Data(), combination), "pdf");
+  else if(idx == 3 && np >2 ) c->Print(Form("%s/longitudinal_xz_%i.pdf", opath.Data(), combination), "pdf");
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) {
@@ -304,7 +309,7 @@ void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) {
 }
 
 void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
-  TString outputFileName = TString::Format("%s/peaks_%i.root", path.Data(), combination);
+  TString outputFileName = TString::Format("%s/peaks_%i.root", opath.Data(), combination);
   TFile *outputFile = new TFile(outputFileName, "RECREATE");
   TNtuple *ntuple = new TNtuple("showers","tagged showers","cell:combination:tag:x:y:start:end:peak:maxplate:nseg:rankbin");
   TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
@@ -340,15 +345,15 @@ int main(int argc, char* argv[]) {
     TStopwatch stopWatch;
     stopWatch.Start();
 
-    setRange(data, &path, cell, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates, &xLow, &yLow);
+    setRange(data, &path, &opath, cell, &xMin, &xMax, &yMin, &yMax, &xBin, &yBin, &nPlates, &xLow, &yLow);
     
     gStyle->SetOptStat(0);
     TH2::AddDirectory(false);
     TH2F* hm[nPlates];
 
-    TString outputPath = TString::Format("%s/%i", path.Data(), cell);
-    if (!std::filesystem::exists(outputPath.Data())) std::filesystem::create_directory(outputPath.Data());
-    TString outputName = TString::Format("%s/histo_shifts_%i.root", outputPath.Data(), combination);
+    // TString outputPath = TString::Format("%s/%i", path.Data(), cell);
+    if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
+    TString outputName = TString::Format("%s/histo_shifts_%i.root", opath.Data(), combination);
     TFile *outputFile = new TFile(outputName, "RECREATE");
     std::cout << "Combination " << combination << std::endl;
     
@@ -356,20 +361,20 @@ int main(int argc, char* argv[]) {
  
     TCanvas *c = new TCanvas("c", "c", 800, 800);
     c->SetGrid();
-    // hComb->Smooth();
+    hComb->Smooth();
     hComb->Draw("colz");
     c->Update();
-    c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));
+    c->Print(Form("%s/sh_%i.gif+180", opath.Data(), combination));
     TObjArray peaks;
     TObjArray txt;
     int ranks[ntag];
     get_peaks(*hComb,peaks,txt,ntag,ranks,bkg);
     hComb->GetZaxis()->SetRangeUser(bkg, hComb->GetMaximum());
     c->Update();
-    c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));
+    c->Print(Form("%s/sh_%i.gif+180", opath.Data(), combination));
     drawEllipse(peaks,txt, kBlack);
     c->Update();
-    c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));
+    c->Print(Form("%s/sh_%i.gif+180", opath.Data(), combination));
 
     TH1F *h_long[ntag];
     for(int i=0; i<ntag; i++) {
@@ -378,15 +383,15 @@ int main(int argc, char* argv[]) {
 
     for(int p=1; p<=nPlates; p++) { 
         printf("Plate %i\n", p);
-        // hm[p-1]->Smooth();
+        hm[p-1]->Smooth();
         hm[p-1]->Draw("colz");
         drawEllipse(peaks,txt, kBlack);
         count_bins(hm[p-1], peaks, p, &h_long[0], bkg);
         // hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
         c->Update();
-        c->Print(Form("%s/sh_%i.gif+12", path.Data(), combination));
+        c->Print(Form("%s/sh_%i.gif+12", opath.Data(), combination));
     }
-    c->Print(Form("%s/sh_%i.gif++", path.Data(), combination));
+    c->Print(Form("%s/sh_%i.gif++", opath.Data(), combination));
 
     makeNtuple(combination, cell, &h_long[0], peaks,ranks);
 
