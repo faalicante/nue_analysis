@@ -4,7 +4,7 @@
 #include <TH2F.h>
 #include <TString.h>
 
-int r0 = (int)(250./50);
+int r0 = (int)(500./50);
 float x;
 float y;
 int p;
@@ -18,9 +18,9 @@ TH2F* projectHist(TFile* f, int plate) {
 }
 
 void fillTree(TH2F* h2, TTree* tree, float x0, float y0, int plate) {
+    h2->Smooth();
     int xbin = h2->GetXaxis()->FindBin(x0);
     int ybin = h2->GetYaxis()->FindBin(y0);
-    h2->Smooth();
     for (int ix = xbin-r0; ix < xbin+r0; ++ix) {
         for (int iy = ybin-r0; iy < ybin+r0; ++iy) {
             float x1 = h2->GetXaxis()->GetBinLowEdge(ix);

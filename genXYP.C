@@ -1,5 +1,23 @@
-int genXYP(int cell){
-  const int brick = 121;
+#include "TFile.h"
+#include "TH2F.h"
+#include "TH3F.h"
+#include "TKey.h"
+#include "TROOT.h"
+#include "TList.h"
+#include "TSystem.h"
+#include "TStopwatch.h"
+#include <iostream>
+#include <filesystem>
+#include "EdbCell2.h"
+#include "EdbLayer.h"
+#include "EdbScanProc.h"
+#include "EdbID.h"
+#include "EdbCouplesTree.h"
+#include "EdbSegP.h"
+#include "EdbAffine2D.h"
+
+int main(int cell){
+  const int brick = 123;
   const int nx = 18;
   const int ny = nx;
   const float xmin = 5000.;
@@ -9,16 +27,16 @@ int genXYP(int cell){
 
   EdbCell2 *emulsioncell = new EdbCell2();
   emulsioncell->InitCell(nx,xmin,xmax,ny,ymin,ymax,1);
+  const float overlap_fraction = 0.4;
   const int ix=(cell % nx);
   const int iy=(cell / ny);
-  const float xmincell = emulsioncell->X(ix)-emulsioncell->Xbin()/2;
-  const float xmaxcell = emulsioncell->X(ix)+emulsioncell->Xbin()/2;
-  const float ymincell = emulsioncell->Y(iy)-emulsioncell->Ybin()/2;
-  const float ymaxcell = emulsioncell->Y(iy)+emulsioncell->Ybin()/2;
+  const float xmincell = emulsioncell->X(ix)-emulsioncell->Xbin()*(0.5+overlap_fraction);
+  const float xmaxcell = emulsioncell->X(ix)+emulsioncell->Xbin()*(0.5+overlap_fraction);
+  const float ymincell = emulsioncell->Y(iy)-emulsioncell->Ybin()*(0.5+overlap_fraction);
+  const float ymaxcell = emulsioncell->Y(iy)+emulsioncell->Ybin()*(0.5+overlap_fraction);
   const int bin_size = 50;
   const int xbin = (int)((xmaxcell-xmincell)/bin_size);
   const int ybin = (int)((ymaxcell-ymincell)/bin_size);
-  const float overlap_fraction = 0.7;
 
   TFile *rootfile = new TFile(Form("hist_XYP_b%i_%i_%i.root", brick, ix, iy),"RECREATE");
   TH2D *hXY = new TH2D("XYseg","XYseg;x[#mum];y[#mum]", xbin, xmincell, xmaxcell, ybin, ymincell, ymaxcell);
@@ -38,7 +56,7 @@ int genXYP(int cell){
 
   int npl = ss->eIDS.GetEntries();
   TString cutstring = "eCHI2P<2.4&&s.eW>20&&eN1<=1&&eN2<=1&&s1.eFlag>=0&&s2.eFlag>=0";
-  cutstring = cutstring + "&&" + Form("TMath::Abs(s.eX-%f) < %f && TMath::Abs(s.eY-%f) < %f", emulsioncell->X(ix), emulsioncell->Xbin()*(0.5+overlap_fraction), emulsioncell->Y(iy), emulsioncell->Ybin()*(0.5+overlap_fraction));
+  cutstring = cutstring + "&&" + Form("TMath::Abs(s.eX-%f) < %f && TMath::Abs(s.eY-%f) < %f", emulsioncell->X(ix), emulsioncell->Xbin()*(1+overlap_fraction), emulsioncell->Y(iy), emulsioncell->Ybin()*(1+overlap_fraction));
   TCut *cut = new TCut(cutstring);
   cut->Print();
 

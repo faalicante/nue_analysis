@@ -22,15 +22,15 @@ void setPath(int data, TString* path, int cell, int* nPlates) {
         *nPlates = 60;
     }
     else if (data==2) {
-        *path = TString("/Users/fabioali/cernbox");
-        // *path = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/%i", cell);
+        // *path = TString("/Users/fabioali/cernbox");
+        *path = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/%i", cell);
         *nPlates = 57;
     }
 }
 
 int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt, const int bkg) {
   int rankbin = h2.GetMaximum();
-  if (rankbin > bkg) {
+  if (rankbin>bkg) {
     Int_t MaxBin = h2.GetMaximumBin();
     Int_t ix,iy,iz;
     int radius = 300;
@@ -44,15 +44,15 @@ int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt, const int bkg) {
     t->SetTextSize(0.03);
     txt.Add(t);
     int r0=6;
-    for(int iix = ix-r0; iix<=ix+r0; iix++) {//to fix remove the circle not square
+    for(int iix = ix-r0; iix<=ix+r0; iix++) {
       for(int iiy = iy-r0; iiy<=iy+r0; iiy++) {
         float distance = (pow(iix-ix,2)+pow(iiy-iy,2))/pow(r0,2);
         if (distance <= 1) h2.SetBinContent(iix,iiy,0);
       }
-    }
-    return rankbin;
+    }  
+  return rankbin;
   }
-  else return 0;
+  return 0;
 }
 
 void get_peaks(TH2F &h2, TObjArray &peaks, TObjArray &txt, int npmax, int *ranks, const int bkg) {
@@ -89,16 +89,14 @@ void getEntriesInEllipse(TH2F &h2, TEllipse &el, float *entries) {
       float distance = (pow(x-x0,2)+pow(y-y0,2))/pow(r1,2);
       if (distance <= 1) {
         int binContent = h2.GetBinContent(i, j);
-        *entries = *entries + binContent;
+        *if(binContent>8) *entries = *entries + binContent;
         }
       }
-    }
-  // }
-  
+    }  
   if (*entries<0) *entries = 0;
 }
 
-void count_bins(int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F **h_long, int data) {
+void count_bins(TH2F &h2, TObjArray &peaks, int plate, TH1F **h_long, int data) {
   int np = peaks.GetEntries();
   float entries;
 
@@ -185,7 +183,7 @@ int main(int argc, char* argv[]) {
   TObjArray peaks;
   TObjArray txt;
   int ranks[ntag];
-  get_peaks(*h2,peaks,txt,ntag,ranks,bkg);
+  get_peaks(*h2,peaks,txt,ntag,ranks);
   h2->GetZaxis()->SetRangeUser(bkg, ranks[0]);
   // c->Update();
   // c->Print(Form("%s/sh_%i.gif+180", path.Data(), combination));

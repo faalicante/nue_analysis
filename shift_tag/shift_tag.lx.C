@@ -32,32 +32,29 @@ const int shiftRange = 50;   //mrad
 const int shiftStep  = 2;    //mrad
 const int stepZ      = 1350; //um
 const int radius     = 300;  //um
-const int ntag = 10;
+const int ntag = 20;
 const int bkg = 340;
 int xMin, xMax, yMin, yMax, xBin, yBin, xLow, yLow;
 int nPlates;
 TString path;
 TString opath;
-TString histName;
-
 
 int getBrick(int brick) {
-    static const int bricks[4][5] = {
-        {11, 21, 31, 41, 51},
-        {12, 22, 32, 42, 52},
-        {13, 23, 33, 43, 53},
-        {14, 24, 34, 44, 54}
-    };
-    for (int group = 0; group < 4; ++group) {
-        for (int i = 0; i < 5; ++i) {
-            if (brick == bricks[group][i]) return group + 1;
-        }
+    int bricks1[] = {11, 21, 31, 41, 51};
+    int bricks2[] = {12, 22, 32, 42, 52};
+    int bricks3[] = {13, 23, 33, 43, 53};
+    int bricks4[] = {14, 24, 34, 44, 54};
+    for (int i = 0; i < 5; i++) {
+        if (brick == bricks1[i]) return 1;
+        else if (brick == bricks2[i]) return 2;
+        else if (brick == bricks3[i]) return 3;
+        else if (brick == bricks4[i]) return 4;
     }
     return 0;
 }
 
 void setRange(int data, TString* path, TString* opath, int cell, int* xMin, int* xMax, int* yMin, int* yMax, int* xBin, int* yBin, int* nPlates, int* xLow, int* yLow) {
-    if (data==0) { // Muon simulation
+    if (data==0) {
         // *path = "/Users/fabioali/cernbox";
         *path = TString::Format("/eos/experiment/sndlhc/users/falicant/simulations/muon1E5_simsndlhc/b%06i", cell);
         *opath = *path;
@@ -67,28 +64,36 @@ void setRange(int data, TString* path, TString* opath, int cell, int* xMin, int*
         *yMin = 79000;
         *yMax = 99000;
     }
-    else if (data==1) { // Nue simulation
-        *path = "/Users/fabioali/cernbox/test_shift/nue_muon";
-        // *path = TString::Format("/eos/experiment/sndlhc/users/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%06i", cell);
+    else if (data==1) {
+        *path = TString::Format("/eos/experiment/sndlhc/users/falicant/Simulations_sndlhc/nuecc_withcrisfiles_25_July_2022/b%06i", cell);
         *opath = *path;
         *nPlates = 60;
-        // int group = getBrick(cell);
-        // switch (group) {
-        //     case 1: *xMin = 200000; *yMin = 0; break;
-        //     case 2: *xMin = 0; *yMin = 0; break;
-        //     case 3: *xMin = 200000; *yMin = 200000; break;
-        //     case 4: *xMin = 0; *yMin = 200000; break;
-        // }
-        *xMin = 239000;
-        *yMin = 146000;;
-        *xMax = *xMin + 10000;
-        *yMax = *yMin + 10000;
+        int group = getBrick(cell);
+        switch (group) {
+            case 1:
+                *xMin = 200000;
+                *yMin = 0;
+                break;
+            case 2:
+                *xMin = 0;
+                *yMin = 0;
+                break;
+            case 3:
+                *xMin = 200000;
+                *yMin = 200000;
+                break;
+            case 4:
+                *xMin = 0;
+                *yMin = 200000;
+                break;
+        }
+        *xMax = *xMin + 200000;
+        *yMax = *yMin + 200000;
     }
-    else if (data==2) { // Real data
-        *path = "/Users/fabioali/cernbox/test_shift/trk";
-        *opath = *path;
-        // *path = "/eos/experiment/sndlhc/emulsionData/2022/emureco_Napoli/RUN1/b000121/cells";
-        // *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/trk/%i", cell);
+    else if (data==2) {
+        // *path = "/Users/fabioali/cernbox/test_shift/trk";
+        *path = "/eos/experiment/sndlhc/emulsionData/2022/emureco_Napoli/RUN1/b000121/cells";
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/trk/%i", cell);
         *nPlates = 57;
         *xLow = cell % 18;
         *yLow = cell / 18;
@@ -107,8 +112,7 @@ void openFiles(int cell, TFile* f[9]) {
         for (int xCell = xLow-1; xCell <= xLow+1; xCell++) {
             if (xCell < 1 || xCell > 18 || yCell < 1 || yCell > 18) f[idx] = nullptr;
             else {
-                TString histFile = TString::Format("%s/cell_%i0_%i0_1x1cm/b000021.0.0.0.trk.root", path.Data(), xCell+1, yCell+1);
-                std::cout << histFile << std::endl;
+                TString histFile = TString::Format("%s/cell_%i0_%i0_1x1cm/b000021/b000021.0.0.0.trk.root", path.Data(), xCell+1, yCell+1);
                 f[idx] = TFile::Open(histFile);
             }
             idx++;   
@@ -117,33 +121,15 @@ void openFiles(int cell, TFile* f[9]) {
 }
 
 TH2F* projectHist(TFile* f, int plate) {
+    TString histName = TString::Format("XYseg_%d", plate);
     TH3F* h3 = (TH3F*)(f->Get("XYPseg"));
     h3->GetZaxis()->SetRange(plate+1,plate+1);
     TH2F* h2 = (TH2F*)(h3->Project3D("yx"));
     return h2;
 }
 
-TH2F* matrixCells(TFile* f, int plate, double shiftX, double shiftY) {
-    TH2F* hm = new TH2F(histName, histName, xBin, xMin, xMax, yBin, yMin, yMax);
-    TH2F* h2 = projectHist(f, plate);
-    for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
-        double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
-        if (xCenter <= xMax && xCenter >= xMin) {
-            for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
-                double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-                if (yCenter <= yMax && yCenter >= yMin) {
-                    double content = h2->GetBinContent(xBin, yBin);
-                    int xBinNew = hm->GetXaxis()->FindBin(xCenter);
-                    int yBinNew = hm->GetYaxis()->FindBin(yCenter);
-                    hm->SetBinContent(xBinNew, yBinNew, content);
-                }
-            }
-        }
-    }
-    return hm;
-}
-
 TH2F* matrixCells(TFile* f[9], int plate, double shiftX, double shiftY) {
+    TString histName = TString::Format("XYseg_%d", plate);
     TH2F* hm = new TH2F(histName, histName, xBin, xMin, xMax, yBin, yMin, yMax);
     TH2F* h2;
     for (int i = 0; i < 9; i++) {
@@ -170,15 +156,16 @@ TH2F* matrixCells(TFile* f[9], int plate, double shiftX, double shiftY) {
     return hm;
 }
 
-TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName) {
+TH2F* stackHist(int data, int combination, int cell, TH2F **hm) {
     TFile* f, *ff[9];
 
     if (data==0) {
         TString fileName = TString::Format("%s/hist_XY_muon.root", path.Data());
         f = TFile::Open(fileName);
+        // h3 = (TH3F*)(f->Get("XYPseg"));
     }
     else if (data==1) {
-        TString fileName = TString::Format("%s/b000011.0.0.0.trk.root", path.Data());
+        TString fileName = TString::Format("%s/hist_XYP_nue.root", path.Data());
         f = TFile::Open(fileName);
     }
     else if (data==2) {
@@ -196,13 +183,18 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
         double shiftX = shiftTX / 1000.0 * stepZ * layer;
         double shiftY = shiftTY / 1000.0 * stepZ * layer;
 
-        *histName = TString::Format("XYseg_%d", plate);
+        TString histName = TString::Format("XYseg_%d", plate);
         if (data ==0 || data==1) {
-            hm[layer] = matrixCells(f, plate, shiftX, shiftY);
+            TH2F *h2 = (TH2F*)(f->Get(histName.Data()));
+            hm[layer] = matrixCells(&ff[0], plate, shiftX, shiftY);
+
         }
         else if (data==2) {
+            // h2 = matrixCells(&ff[0], plate);
+
             hm[layer] = matrixCells(&ff[0], plate, shiftX, shiftY);
         }
+        // delete h2;
         hComb->Add(hm[layer]);
     }
     if (data!=2) f->Close();
@@ -361,7 +353,7 @@ int main(int argc, char* argv[]) {
     if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
     std::cout << "Combination " << combination << std::endl;
     
-    TH2F* hComb = stackHist(data, combination, cell, &hm[0], &histName);
+    TH2F* hComb = stackHist(data, combination, cell, &hm[0]);
  
     TCanvas *c = new TCanvas("c", "c", 800, 800);
     c->SetGrid();
@@ -391,7 +383,7 @@ int main(int argc, char* argv[]) {
         hm[p-1]->Draw("colz");
         drawEllipse(peaks,txt, kBlack);
         count_bins(hm[p-1], peaks, p, &h_long[0], bkg);
-        hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
+        //hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
         c->Update();
         c->Print(Form("%s/sh_%i.gif+12", opath.Data(), combination));
     }

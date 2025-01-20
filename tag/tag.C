@@ -22,8 +22,8 @@ void setPath(int data, TString* path, int cell, int* nPlates) {
         *nPlates = 60;
     }
     else if (data==2) {
-        // *path = TString("/Users/fabioali/cernbox");
-        *path = TString("/eos/experiment/sndlhc/users/falicant/RUN1/b121/histo");
+        *path = TString("/Users/fabioali/cernbox");
+        // *path = TString("/eos/experiment/sndlhc/users/falicant/RUN1/b121/hist");
         *nPlates = 57;
     }
 }
@@ -92,13 +92,11 @@ void getEntriesInEllipse(TH2F &h2, TEllipse &el, int *entries) {
         if(binContent>8) *entries = *entries + binContent;
         }
       }
-    }
-  // }
-  
+    }  
   if (*entries<0) *entries = 0;
 }
 
-void count_bins(const int npmax, TH2F &h2, TObjArray &peaks, int plate, TH1F **h_long, int data) {
+void count_bins(TH2F &h2, TObjArray &peaks, int plate, TH1F **h_long, int data) {
   int np = peaks.GetEntries();
   int entries;
 
@@ -124,9 +122,10 @@ void makePlots(int cell, TCanvas *c, int np, int npmax, TH1F *h_long, int *maxPe
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) {
-  int entries = h_long->Integral();
-  *firstPlate = h_long->FindFirstBinAbove(entries * 0.1);
-  *lastPlate = h_long->FindLastBinAbove(entries * 0.1);
+  float entries = h_long->Integral();
+  *firstPlate = h_long->FindFirstBinAbove(entries * 0.01);
+  *lastPlate = h_long->FindLastBinAbove(entries * 0.01);
+  std::cout << entries << " " << entries * 0.01 << " " << *firstPlate << std::endl;
 }
 
 void makeNtuple(int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
@@ -203,7 +202,7 @@ int main(int argc, char* argv[]) {
     h->Draw("colz");
     drawEllipse(peaks,txt, kBlack);
     count_bins(ntag, *h, peaks, p, &h_long[0], data);
-    h->GetZaxis()->SetRangeUser((int)round((double)bkg/nPlates), h->GetMaximum());
+    // h->GetZaxis()->SetRangeUser((int)round((double)bkg/nPlates), h->GetMaximum());
     c->Update();
     c->Print(Form("%s/sh_%i.gif+12", path.Data(), cell));
   }
