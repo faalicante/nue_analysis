@@ -21,6 +21,8 @@ def makeTMap(hTmap, peaks):
     peak_y_coords = peaks[1]
     peak_tx_coords = []
     peak_ty_coords = []
+    output = ROOT.TFile.Open(f'peak_map_{cell}.root', 'RECREATE')
+    outtree = ROOT.TNtuple("showers", "showers", "cell:combination:tx:ty:x:y")
     for px, py in zip(peak_x_coords, peak_y_coords):
         # print(px,py)
         x = np.searchsorted(xedges, px)
@@ -30,6 +32,7 @@ def makeTMap(hTmap, peaks):
         iy = combination % nbins
         if abs(ix-25)==4 or abs(iy-25)==4:
             print(map[(x,y)], ix-25, iy-25, px, py)
+        outtree.Fill(map[(x,y)][0], map[(x,y)][1], ix-25, iy-25, px, py)
         tx_coord = txedges[ix]
         ty_coord = tyedges[iy]
         peak_tx_coords.append(int(tx_coord)+1)
@@ -43,8 +46,11 @@ def makeTMap(hTmap, peaks):
     plt.ylabel('TY')
     # plt.legend()
     # plt.show()
-    plt.savefig(f'/Users/fabioali/Desktop/shifts/shift_Tmap_{cell}.png')
+    # plt.savefig(f'/Users/fabioali/Desktop/shifts/shift_Tmap_{cell}.png')
     plt.close()
+    output.cd()
+    outtree.Write()
+    output.Close()
 
     return peak_tx_coords, peak_ty_coords
 
@@ -63,7 +69,7 @@ def makeMap(hmap):
     plt.ylabel('Y')
     # plt.legend()
     # plt.show()
-    plt.savefig(f'/Users/fabioali/Desktop/shifts/shift_map_{cell}.png')
+    # plt.savefig(f'/Users/fabioali/Desktop/shifts/shift_map_{cell}.png')
     plt.close()
 
     return peak_x_coords, peak_y_coords
@@ -85,8 +91,8 @@ nxbins = int(xRange/xStep)
 nTag = 20
 
 # File
-# path = '/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/trk/58/peaks.root'
-path = f'/Users/fabioali/cernbox/test_shift/trk/{cell}/peaks.root'
+path = f'/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/{cell}/peaks.root'
+# path = f'/Users/fabioali/cernbox/test_shift/trk/{cell}/peaks.root'
 file = ROOT.TFile.Open(path)
 showers = file.Get("showers")
 
