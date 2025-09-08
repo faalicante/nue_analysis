@@ -62,7 +62,7 @@ void getPath(int data, TString* path, TString* opath, int cell, int* nPlates, in
     else if (data == 2) { // Real data
         // *path = "/Users/fabioali/cernbox/shift/b121";
         // *opath = *path;
-        *path = "/eos/experiment/sndlhc/emulsionData/2022/emureco_Napoli/RUN1/b000121/cells";
+        *path = "/eos/experiment/sndlhc/emulsionData/emureco_Napoli/RUN1/b000121/cells";
         *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/%i", cell);
         *nPlates = 57;
         *stepZ = 1350;
@@ -94,7 +94,6 @@ void openFiles(int cell, TFile** f) {
     TString fileName = TString::Format("%s/b000021.0.0.%i.trk.root", path.Data(), cell+1);
     std::cout << fileName << std::endl;
     *f = TFile::Open(fileName);
-    std::cout << *f << std::endl;
     setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
 }
 
@@ -203,7 +202,7 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
     TH2F* hComb = new TH2F("XYseg", "XYseg", xBins, xMin, xMax, yBins, yMin, yMax);
     for (int layer = 0; layer < nPlates; ++layer) {
         int plate = layer + 1;
-        std::cout << "Shifting plate " << plate << std::endl;
+        // std::cout << "Shifting plate " << plate << std::endl;
 
         double shiftX = shiftTX / 1000.0 * stepZ * layer;
         double shiftY = shiftTY / 1000.0 * stepZ * layer;
@@ -305,7 +304,7 @@ void makePlots(int cell, int combination, TCanvas *c, int np, int npmax, TH1F *h
     int idx = (np%3) +1;
     if (idx==1) c->Clear("D");
     c->cd(idx)->SetGrid(1,0);
-    *maxPeak = h_long->GetMaximum(),
+    *maxPeak = h_long->GetMaximum();
     *maxPlate = h_long->GetMaximumBin();
     h_long->SetLineColor(1);
     h_long->SetLineWidth(2);
@@ -321,7 +320,7 @@ void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { // problem with 
     float entries = h_long->Integral();
     *firstPlate = h_long->FindFirstBinAbove(entries * 0.005);
     *lastPlate = h_long->FindLastBinAbove(entries * 0.005);
-    std::cout << entries << " " << *firstPlate << std::endl;
+    // std::cout << entries << " " << *firstPlate << std::endl;
 }
 
 void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
@@ -394,7 +393,7 @@ int main(int argc, char* argv[]) {
     }
     
     for(int p=1; p<=nPlates; p++) { 
-        printf("Tagging plate %i\n", p);
+        // printf("Tagging plate %i\n", p);
         hm[p-1]->Smooth();
         hm[p-1]->Draw("colz");
         drawEllipse(peaks,txt, kBlack);
