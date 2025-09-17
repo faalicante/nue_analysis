@@ -10,6 +10,7 @@
 #include "TSystem.h"
 #include "TStopwatch.h"
 #include "TStyle.h"
+#include "TSpectrum.h"
 #include <iostream>
 #include <filesystem>
 #include <map>
@@ -28,11 +29,11 @@ void printMemoryInfo() {
 
 // Parameters
 bool print = false;
-const int binSize    = 50;   // (um)
+const int binSize    = 25;   // (um)
 const int shiftRange = 50;   // (mrad)
 const int shiftStep  = 2;    // (mrad)
-const int radius     = 300;  // (um)
-const int ntag = 20;
+const int radius     = 250;  // (um)
+const int ntag = 30;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 int nPlates, stepZ;
 float bkg = 0;
@@ -77,16 +78,16 @@ void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, 
     int fay = h2->FindFirstBinAbove(0,2);
     int lax = h2->FindLastBinAbove(0,1);
     int lay = h2->FindLastBinAbove(0,2);
-    *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - 1000;
-    *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + 1000;
-    *yMin = (int)(h2->GetYaxis()->GetBinLowEdge(fay)) - 1000;
-    *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + 1000;
+    *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - 500;
+    *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + 500;
+    *yMin = (int)(h2->GetYaxis()->GetBinLowEdge(fay)) - 500;
+    *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + 500;
     *xBins = int((*xMax - *xMin) / binSize);
     *yBins = int((*yMax - *yMin) / binSize);
-    *bkg = 1.5 * h2->Integral(fax, lax, fay, lay) / (lax - fax + 1) / (lay - fay + 1);
+    int xBinsBkg = int((*xMax - *xMin - 1000) / binSize);
+    int yBinsBkg = int((*yMax - *yMin - 1000) / binSize);
+    *bkg = 1.5 * h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
     std::cout << "Average background " << *bkg << std::endl;
-    std::cout << *xMin << " " << *xMax << " " << *yMin << " " << *yMax << std::endl;
-    std::cout << *xBins << " " << *yBins << std::endl;
     delete h2;
 }
 
@@ -316,30 +317,32 @@ void makePlots(int cell, int combination, TCanvas *c, int np, int npmax, TH1F *h
     }
 }
 
-void findStart(TH1F* h_long, int *firstPlate, int *lastPlate) { // problem with holes
+void findStart(TH1F* h_long, int *firstPlate, int *lastPlate, int *nfound) {
     float entries = h_long->Integral();
     *firstPlate = h_long->FindFirstBinAbove(entries * 0.005);
     *lastPlate = h_long->FindLastBinAbove(entries * 0.005);
-    // std::cout << entries << " " << *firstPlate << std::endl;
+    TSpectrum *s = new TSpectrum(4);
+    *nfound = s->Search(h_long, 3, "", 0.2);
 }
 
 void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
     TString outputFileName = TString::Format("%s/peaks_%i_%i.root", opath.Data(), cell, combination);
     TFile *outputFile = new TFile(outputFileName, "RECREATE");
-    TNtuple *ntuple = new TNtuple("showers","tagged showers","cell:combination:tag:x:y:start:end:peak:maxplate:nseg:rankbin");
+    TNtuple *ntuple = new TNtuple("showers","tagged showers","cell:combination:tag:x:y:start:end:peak:maxplate:nseg:nfound:rankbin");
     TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
     c2->Divide(1,3);
     int np = peaks.GetEntries();
-    int entries, firstPlate, lastPlate, maxPeak, maxPlate;
+    int entries, firstPlate, lastPlate, nfound, maxPeak, maxPlate;
 
     for(int i=0; i<np; i++) {
         TEllipse *el = ((TEllipse*)(peaks.At(i)));
         float x = el->GetX1();
         float y = el->GetY1();
-        findStart(h_long[i], &firstPlate, &lastPlate);
         makePlots(cell, combination, c2, i, np, h_long[i], &maxPeak, &maxPlate);
+        findStart(h_long[i], &firstPlate, &lastPlate, &nfound);
         int nseg = h_long[i]->Integral(firstPlate, lastPlate);
-        ntuple->Fill(cell, combination, i+1, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, ranks[i]);
+        if (print) h_long[i]->Write();
+        ntuple->Fill(cell, combination, i+1, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, nfound, ranks[i]);
     }
     outputFile->Write();
     outputFile->Close();
@@ -380,10 +383,10 @@ int main(int argc, char* argv[]) {
     TObjArray txt;
     int ranks[ntag];
     get_peaks(*hComb,peaks,txt,ntag,ranks,bkg);
-    hComb->GetZaxis()->SetRangeUser(bkg, hComb->GetMaximum());
+    drawEllipse(peaks,txt, kBlack);
     c->Update();
     if (print) c->Print(Form("%s/sh_%i_%i.gif+180", opath.Data(), cell, combination));
-    drawEllipse(peaks,txt, kBlack);
+    hComb->GetZaxis()->SetRangeUser(bkg, hComb->GetMaximum());
     c->Update();
     if (print) c->Print(Form("%s/sh_%i_%i.gif+180", opath.Data(), cell, combination));
 
