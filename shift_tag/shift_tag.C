@@ -11,6 +11,7 @@
 #include "TStopwatch.h"
 #include "TStyle.h"
 #include "TSpectrum.h"
+#include "TMath.h"
 #include <iostream>
 #include <filesystem>
 #include <map>
@@ -18,6 +19,7 @@
 #include <stdexcept>
 #include <cmath>
 
+// add brick variable, lab and plot paths on eos
 
 void printMemoryInfo() {
     ProcInfo_t procInfo;
@@ -26,14 +28,18 @@ void printMemoryInfo() {
     std::cout << "Memory used: " << mem/1024 << " MB" << std::endl;
 }
 
+// paths
+const char* lab = "Napoli";
+const int run = 1;
+const int brick = 121;
 
 // Parameters
 bool print = false;
-const int binSize    = 25;   // (um)
+const int binSize    = 50;   // (um)
 const int shiftRange = 50;   // (mrad)
 const int shiftStep  = 2;    // (mrad)
-const int radius     = 250;  // (um)
-const int ntag = 30;
+const int radius     = 300;  // (um)
+const int ntag = 50;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 int nPlates, stepZ;
 float bkg = 0;
@@ -43,10 +49,10 @@ TString histName;
 
 void getPath(int data, TString* path, TString* opath, int cell, int* nPlates, int* xLow, int* yLow, int* stepZ) {
     if (data == 0) { // Muon simulation
-        // *path = "/Users/fabioali/cernbox/shift/muon";
-        // *opath = *path;
-        *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/muon1.3E5/cell_reco";
-        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_muon/%i", cell);
+        *path = "/Users/fabioali/cernbox/shift/muon";
+        *opath = *path;
+        // *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/muon1.3E5/cell_reco";
+        // *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_muon/%i", cell);
         *nPlates = 60;
         *stepZ = 1315;
         *xLow = cell % 21 + 1;
@@ -63,8 +69,8 @@ void getPath(int data, TString* path, TString* opath, int cell, int* nPlates, in
     else if (data == 2) { // Real data
         // *path = "/Users/fabioali/cernbox/shift/b121";
         // *opath = *path;
-        *path = "/eos/experiment/sndlhc/emulsionData/emureco_Napoli/RUN1/b000121/cells";
-        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/%i", cell);
+        *path = TString::Format("/eos/experiment/sndlhc/emulsionData/emureco_%s/RUN%i/b%06i/cells", lab, run, brick);
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN%i/b%i/shift/%i", run, brick, cell);
         *nPlates = 57;
         *stepZ = 1350;
         *xLow = cell % 18 + 1;
@@ -78,15 +84,17 @@ void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, 
     int fay = h2->FindFirstBinAbove(0,2);
     int lax = h2->FindLastBinAbove(0,1);
     int lay = h2->FindLastBinAbove(0,2);
-    *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - 500;
-    *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + 500;
-    *yMin = (int)(h2->GetYaxis()->GetBinLowEdge(fay)) - 500;
-    *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + 500;
+    *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - radius;
+    *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + radius;
+    *yMin = (int)(h2->GetYaxis()->GetBinLowEdge(fay)) - radius;
+    *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + radius;
     *xBins = int((*xMax - *xMin) / binSize);
     *yBins = int((*yMax - *yMin) / binSize);
-    int xBinsBkg = int((*xMax - *xMin - 1000) / binSize);
-    int yBinsBkg = int((*yMax - *yMin - 1000) / binSize);
-    *bkg = 1.5 * h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
+    int xBinsBkg = int((*xMax - *xMin - radius*2) / binSize);
+    int yBinsBkg = int((*yMax - *yMin - radius*2) / binSize);
+    double mean = h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
+    *bkg = mean + 5 * TMath::Sqrt(mean); // poissonian
+    // *bkg = 1.5 * h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
     std::cout << "Average background " << *bkg << std::endl;
     delete h2;
 }
@@ -318,11 +326,11 @@ void makePlots(int cell, int combination, TCanvas *c, int np, int npmax, TH1F *h
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate, int *nfound) {
-    float entries = h_long->Integral();
-    *firstPlate = h_long->FindFirstBinAbove(entries * 0.005);
-    *lastPlate = h_long->FindLastBinAbove(entries * 0.005);
+    float entries = h_long->GetMaximum();
+    *firstPlate = h_long->FindFirstBinAbove(entries * 0.05);
+    *lastPlate = h_long->FindLastBinAbove(entries * 0.05);
     TSpectrum *s = new TSpectrum(4);
-    *nfound = s->Search(h_long, 3, "", 0.2);
+    *nfound = s->Search(h_long, 4, "nobackground", 0.1);
 }
 
 void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
