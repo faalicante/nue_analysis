@@ -233,7 +233,6 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
         
         hComb->Add(hm[layer]);
     }
-    printMemoryInfo();
 
     if (data == 1) f->Close();
     else {
@@ -350,7 +349,7 @@ void findStart(TH1F* h_long, int *firstPlate, int *lastPlate, int *nfound) {
     *firstPlate = h_long->FindFirstBinAbove(entries * 0.1);
     *lastPlate = h_long->FindLastBinAbove(entries * 0.1);
     TSpectrum *s = new TSpectrum(4);
-    *nfound = s->Search(h_long, 5, "nobackground", 0.5);
+    *nfound = s->Search(h_long, 5, "nobackground", 0.05);
 }
 
 void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
