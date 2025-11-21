@@ -40,19 +40,22 @@ const int shiftRange = 50;   // (mrad)
 const int shiftStep  = 2;    // (mrad)
 const int radius     = 300;  // (um)
 const int ntag = 50;
+const int range = 4000;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 int nPlates, stepZ;
 float bkg = 0;
 TString path;
 TString opath;
+TString ppath;
 TString histName;
 
-void getPath(int data, TString* path, TString* opath, int cell, int* nPlates, int* xLow, int* yLow, int* stepZ) {
+void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, int* nPlates, int* xLow, int* yLow, int* stepZ) {
     if (data == 0) { // Muon simulation
         *path = "/Users/fabioali/cernbox/shift/muon";
         *opath = *path;
         // *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/muon1.3E5/cell_reco";
         // *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_muon/%i", cell);
+        *ppath = *opath;
         *nPlates = 60;
         *stepZ = 1315;
         *xLow = cell % 21 + 1;
@@ -63,14 +66,17 @@ void getPath(int data, TString* path, TString* opath, int cell, int* nPlates, in
         // *opath = *path;
         *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon1.3E5/b000021";
         *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_nue/%i", cell);
+        *ppath = *opath;
         *nPlates = 60;
         *stepZ = 1315;
     }
     else if (data == 2) { // Real data
         // *path = "/Users/fabioali/cernbox/shift/b121";
         // *opath = *path;
+        // *ppath = *opath;
         *path = TString::Format("/eos/experiment/sndlhc/emulsionData/emureco_%s/RUN%i/b%06i/cells", lab, run, brick);
         *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN%i/b%i/shift/%i", run, brick, cell);
+        *ppath = TString::Format("/eos/user/f/falicant/RUN%i/brick%i/shifts", run, brick);
         *nPlates = 57;
         *stepZ = 1350;
         *xLow = cell % 18 + 1;
@@ -84,19 +90,25 @@ void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, 
     int fay = h2->FindFirstBinAbove(0,2);
     int lax = h2->FindLastBinAbove(0,1);
     int lay = h2->FindLastBinAbove(0,2);
-    *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - radius;
-    *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + radius;
-    *yMin = (int)(h2->GetYaxis()->GetBinLowEdge(fay)) - radius;
-    *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + radius;
+    *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - range;
+    *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + range;
+    *yMin = (int)(h2->GetYaxis()->GetBinLowEdge(fay)) - range;
+    *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + range;
     *xBins = int((*xMax - *xMin) / binSize);
     *yBins = int((*yMax - *yMin) / binSize);
-    int xBinsBkg = int((*xMax - *xMin - radius*2) / binSize);
-    int yBinsBkg = int((*yMax - *yMin - radius*2) / binSize);
+    int xBinsBkg = int((*xMax - *xMin - range*2) / binSize);
+    int yBinsBkg = int((*yMax - *yMin - range*2) / binSize);
     double mean = h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
     *bkg = mean + 5 * TMath::Sqrt(mean); // poissonian
     // *bkg = 1.5 * h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
     std::cout << "Average background " << *bkg << std::endl;
     delete h2;
+}
+
+TH3F* loadH3(TFile *f) {
+    TH3F* h3 = (TH3F*)(f->Get("XYPseg"));
+    h3->SetDirectory(0);
+    return h3;
 }
 
 void openFiles(int cell, TFile** f) {
@@ -106,7 +118,7 @@ void openFiles(int cell, TFile** f) {
     setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
 }
 
-void openFiles(int data, int cell, TFile* f[9]) {
+void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
     int idx = 0;
     if (data == 0) {
         for (int yCell = yLow-1; yCell <= yLow+1; yCell ++) {
@@ -128,8 +140,9 @@ void openFiles(int data, int cell, TFile* f[9]) {
                 if (xCell < 1 || xCell > 18 || yCell < 1 || yCell > 18) f[idx] = nullptr;
                 else {
                     TString histFile = TString::Format("%s/cell_%i0_%i0/b000021/b000021.0.0.0.trk.root", path.Data(), xCell, yCell);
-                    std::cout << histFile << std::endl;
+                    // std::cout << histFile << std::endl;
                     f[idx] = TFile::Open(histFile);
+                    H3cells[idx] = loadH3(f[idx]);
                 }
                 idx++;   
             }
@@ -138,54 +151,50 @@ void openFiles(int data, int cell, TFile* f[9]) {
     setRanges(cell, &f[4], &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
 }
 
-TH2F* projectHist(TFile* f, int plate) {
-    TH3F* h3 = (TH3F*)(f->Get("XYPseg"));
+
+TH2F* projectHist(TH3F* h3, int plate) {
+    h3->GetEntries();
     h3->GetZaxis()->SetRange(plate+1,plate+1);
     TH2F* h2 = (TH2F*)(h3->Project3D("yx"));
-    delete h3;
     return h2;
 }
 
 TH2F* matrixCells(TFile* f, int plate, double shiftX, double shiftY) {
     TH2F* hm = new TH2F(histName, histName, xBins, xMin, xMax, yBins, yMin, yMax);
-    TH2F* h2 = projectHist(f, plate);
+    // TH2F* h2 = projectHist(f, plate);
+    TH2F* h2; //fix for mc
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
         double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
-        if (xCenter <= xMax && xCenter >= xMin) {
-            for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
-                double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-                if (yCenter <= yMax && yCenter >= yMin) {
-                    double content = h2->GetBinContent(xBin, yBin);
-                    int xBinNew = hm->GetXaxis()->FindBin(xCenter);
-                    int yBinNew = hm->GetYaxis()->FindBin(yCenter);
-                    hm->SetBinContent(xBinNew, yBinNew, content);
-                }
-            }
+        if (xCenter > xMax && xCenter < xMin) continue;
+        for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
+            double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
+            if (yCenter > yMax && yCenter < yMin) continue;
+            double content = h2->GetBinContent(xBin, yBin);
+            int xBinNew = hm->GetXaxis()->FindBin(xCenter);
+            int yBinNew = hm->GetYaxis()->FindBin(yCenter);
+            hm->SetBinContent(xBinNew, yBinNew, content);
         }
     }
     return hm;
 }
 
-TH2F* matrixCells(TFile* f[9], int plate, double shiftX, double shiftY) {
+TH2F* matrixCells(TFile* f[9],  TH3F* H3cells[9], int plate, double shiftX, double shiftY) {
     TH2F* hm = new TH2F(histName, histName, xBins, xMin, xMax, yBins, yMin, yMax);
     TH2F* h2;
     for (int i = 0; i < 9; i++) {
         if (f[i] == nullptr) continue;
-        h2 = projectHist(f[i], plate);
+        h2 = projectHist(H3cells[i], plate);
         for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
             double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
-            if (xCenter <= xMax && xCenter >= xMin) {
-                for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
-                    double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-                    if (yCenter <= yMax && yCenter >= yMin) {
-                        double content = h2->GetBinContent(xBin, yBin);
-                        if (content) {
-                            int xBinNew = hm->GetXaxis()->FindBin(xCenter);
-                            int yBinNew = hm->GetYaxis()->FindBin(yCenter);
-                            if (content > hm->GetBinContent(xBinNew, yBinNew)) hm->SetBinContent(xBinNew, yBinNew, content);
-                        }
-                    }
-                }
+            if (xCenter > xMax || xCenter < xMin) continue;
+            for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
+                double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
+                if (yCenter > yMax && yCenter < yMin) continue;
+                double content = h2->GetBinContent(xBin, yBin);
+                if (content <= 0) continue;
+                int xBinNew = hm->GetXaxis()->FindBin(xCenter);
+                int yBinNew = hm->GetYaxis()->FindBin(yCenter);
+                if (content > hm->GetBinContent(xBinNew, yBinNew)) hm->SetBinContent(xBinNew, yBinNew, content);
             }
         }
         delete h2;
@@ -195,38 +204,45 @@ TH2F* matrixCells(TFile* f[9], int plate, double shiftX, double shiftY) {
 
 TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName) {
     TFile *f, *ff[9];
+    TH3F *H3cells[9];
 
     if (data == 1) {
         openFiles(cell, &f);
     }
     else {
-        openFiles(data, cell, &ff[0]);
+        openFiles(data, cell, &ff[0], &H3cells[0]);
     }
 
     double shiftTX = (combination % (shiftRange+1)) * shiftStep - shiftRange;
     double shiftTY = (combination / (shiftRange+1)) * shiftStep - shiftRange;
     // combination = (shiftTY + shiftRange)/shiftStep * (shiftRange + 1) + (shiftTX + shiftRange)/shiftStep
-    std::cout << "Shift TX: " << shiftTX << " mrad, Shift TY: " << shiftTY << " mrad" << std::endl;
+    // std::cout << "Shift TX: " << shiftTX << " mrad, Shift TY: " << shiftTY << " mrad" << std::endl;
     
     TH2F* hComb = new TH2F("XYseg", "XYseg", xBins, xMin, xMax, yBins, yMin, yMax);
     for (int layer = 0; layer < nPlates; ++layer) {
         int plate = layer + 1;
         // std::cout << "Shifting plate " << plate << std::endl;
-
+        
         double shiftX = shiftTX / 1000.0 * stepZ * layer;
         double shiftY = shiftTY / 1000.0 * stepZ * layer;
         
         *histName = TString::Format("XYseg_%d", plate);
+        
         if (data == 1) hm[layer] = matrixCells(f, plate, shiftX, shiftY);
-        else hm[layer] = matrixCells(&ff[0], plate, shiftX, shiftY);
+        else hm[layer] = matrixCells(&ff[0], &H3cells[0], plate, shiftX, shiftY);
+        
         hComb->Add(hm[layer]);
     }
+    printMemoryInfo();
+
     if (data == 1) f->Close();
     else {
         for (int i = 0; i < 9; i++) {
             if (ff[i] != nullptr) ff[i]->Close();
+            delete H3cells[i];
         }
     }
+
     return hComb;
 }
 
@@ -242,12 +258,14 @@ int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt, float bkg) {
         el->SetFillStyle(0);
         peaks.Add(el);
         TText  *t = new TText(x,y+300,Form("%d",peaks.GetEntries()));
-        t->SetTextSize(0.03);
+        t->SetTextSize(0.02);
         txt.Add(t);
         int r0 = (int)round((double)radius/binSize);
         for(int iix = ix-r0; iix<=ix+r0; iix++) {
             for(int iiy = iy-r0; iiy<=iy+r0; iiy++) {
-                float distance = (pow(iix-ix,2)+pow(iiy-iy,2))/pow(r0,2);
+                double dx = iix - ix;
+                double dy = iiy - iy;
+                double distance = (dx*dx + dy*dy)/(r0*r0);
                 if (distance <= 1) h2.SetBinContent(iix,iiy,0);
             }
         }
@@ -287,7 +305,9 @@ void getEntriesInEllipse(TH2F &h2, TEllipse &el, int *entries, float bkg) {
         for (int j = 1; j <= nBinsY; ++j) {
             float x = h2.GetXaxis()->GetBinCenter(i);
             float y = h2.GetYaxis()->GetBinCenter(j);
-            float distance = (pow(x-x0,2)+pow(y-y0,2))/pow(r1,2);
+            double dx = x - x0;
+            double dy = y - y0;
+            double distance = (dx*dx + dy*dy)/(r1*r1);
             if (distance <= 1) {
                 int binContent = h2.GetBinContent(i, j);
                 if(binContent > bkg_p) {
@@ -319,18 +339,18 @@ void makePlots(int cell, int combination, TCanvas *c, int np, int npmax, TH1F *h
     h_long->SetLineWidth(2);
     h_long->Draw("hist");
     if (print) {
-        if(np == 2)                 c->Print(Form("%s/longitudinal_xz_%i_%i.pdf(", opath.Data(), cell, combination), "pdf");
-        else if(np == npmax-1)      c->Print(Form("%s/longitudinal_xz_%i_%i.pdf)", opath.Data(), cell, combination), "pdf");
-        else if(idx == 3 && np >2 ) c->Print(Form("%s/longitudinal_xz_%i_%i.pdf" , opath.Data(), cell, combination), "pdf");
+        if(np == 2)                 c->Print(Form("%s/longitudinal_xz_%i_%i.pdf(", ppath.Data(), cell, combination), "pdf");
+        else if(np == npmax-1)      c->Print(Form("%s/longitudinal_xz_%i_%i.pdf)", ppath.Data(), cell, combination), "pdf");
+        else if(idx == 3 && np >2 ) c->Print(Form("%s/longitudinal_xz_%i_%i.pdf" , ppath.Data(), cell, combination), "pdf");
     }
 }
 
 void findStart(TH1F* h_long, int *firstPlate, int *lastPlate, int *nfound) {
     float entries = h_long->GetMaximum();
-    *firstPlate = h_long->FindFirstBinAbove(entries * 0.05);
-    *lastPlate = h_long->FindLastBinAbove(entries * 0.05);
+    *firstPlate = h_long->FindFirstBinAbove(entries * 0.1);
+    *lastPlate = h_long->FindLastBinAbove(entries * 0.1);
     TSpectrum *s = new TSpectrum(4);
-    *nfound = s->Search(h_long, 4, "nobackground", 0.1);
+    *nfound = s->Search(h_long, 5, "nobackground", 0.5);
 }
 
 void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
@@ -357,6 +377,7 @@ void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int 
 }
 
 int main(int argc, char* argv[]) {
+    gROOT->SetBatch(!print);
     if (argc != 4) {
         std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <combination>" << argv[2] << " <cell>" << argv[3] << std::endl;
         // data = {0: muon, 1: nue, 2: data}
@@ -370,14 +391,14 @@ int main(int argc, char* argv[]) {
     TStopwatch stopWatch;
     stopWatch.Start();
 
-    getPath(data, &path, &opath, cell, &nPlates, &xLow, &yLow, &stepZ);
+    getPath(data, &path, &opath, &ppath, cell, &nPlates, &xLow, &yLow, &stepZ);
     
     gStyle->SetOptStat(0);
     TH2::AddDirectory(false);
     TH2F* hm[nPlates];
 
     if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
-    std::cout << "Combination " << combination << std::endl;
+    // std::cout << "Combination " << combination << std::endl;
     
     TH2F* hComb = stackHist(data, combination, cell, &hm[0], &histName);
  
@@ -386,17 +407,19 @@ int main(int argc, char* argv[]) {
     hComb->Smooth();
     hComb->Draw("colz");
     c->Update();
-    if (print) c->Print(Form("%s/sh_%i_%i.gif+180", opath.Data(), cell, combination));
+    if (print) c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
     TObjArray peaks;
     TObjArray txt;
     int ranks[ntag];
     get_peaks(*hComb,peaks,txt,ntag,ranks,bkg);
-    drawEllipse(peaks,txt, kBlack);
-    c->Update();
-    if (print) c->Print(Form("%s/sh_%i_%i.gif+180", opath.Data(), cell, combination));
-    hComb->GetZaxis()->SetRangeUser(bkg, hComb->GetMaximum());
-    c->Update();
-    if (print) c->Print(Form("%s/sh_%i_%i.gif+180", opath.Data(), cell, combination));
+    if (print) {
+        drawEllipse(peaks,txt, kBlack);
+        c->Update();
+        c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
+        hComb->GetZaxis()->SetRangeUser(bkg, hComb->GetMaximum());
+        c->Update();
+        c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
+    }
 
     TH1F *h_long[ntag];
     for(int i=0; i<ntag; i++) {
@@ -407,13 +430,15 @@ int main(int argc, char* argv[]) {
         // printf("Tagging plate %i\n", p);
         hm[p-1]->Smooth();
         hm[p-1]->Draw("colz");
-        drawEllipse(peaks,txt, kBlack);
         count_bins(hm[p-1], peaks, p, &h_long[0], bkg);
-        // hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
-        c->Update();
-        if (print) c->Print(Form("%s/sh_%i_%i.gif+12", opath.Data(), cell, combination));
+        if (print) {
+            drawEllipse(peaks,txt, kBlack);
+            // hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
+            c->Update();
+            c->Print(Form("%s/sh_%i_%i.gif+12", ppath.Data(), cell, combination));
+        }
     }
-    if (print) c->Print(Form("%s/sh_%i_%i.gif++", opath.Data(), cell, combination));
+    if (print) c->Print(Form("%s/sh_%i_%i.gif++", ppath.Data(), cell, combination));
 
     makeNtuple(combination, cell, &h_long[0], peaks,ranks);
 
