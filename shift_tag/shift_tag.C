@@ -19,8 +19,6 @@
 #include <stdexcept>
 #include <cmath>
 
-// add brick variable, lab and plot paths on eos
-
 void printMemoryInfo() {
     ProcInfo_t procInfo;
     gSystem->GetProcInfo(&procInfo);
@@ -34,41 +32,41 @@ const int run = 1;
 const int brick = 121;
 
 // Parameters
-bool print = false;
+bool print = true;
 const int binSize    = 50;   // (um)
 const int shiftRange = 50;   // (mrad)
 const int shiftStep  = 2;    // (mrad)
 const int radius     = 300;  // (um)
 const int ntag = 50;
-const int range = 4000;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
-int nPlates, stepZ;
+const int nPlates = 57;
+const int stepZ = 1350;
+int range;
 float bkg = 0;
 TString path;
 TString opath;
 TString ppath;
 TString histName;
 
-void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, int* nPlates, int* xLow, int* yLow, int* stepZ) {
+void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, int* xLow, int* yLow, int* range) {
     if (data == 0) { // Muon simulation
-        *path = "/Users/fabioali/cernbox/shift/muon";
-        *opath = *path;
-        // *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/muon1.3E5/cell_reco";
-        // *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_muon/%i", cell);
-        *ppath = *opath;
-        *nPlates = 60;
-        *stepZ = 1315;
-        *xLow = cell % 21 + 1;
-        *yLow = cell / 21 + 1;
+        // *path = "/Users/fabioali/cernbox/shift/muon";
+        // *opath = *path;
+        *path = "/eos/experiment/sndlhc/users/dancc/FEDRA/muon_regenRUN1/cell_reco";
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_muon/%i", cell);
+        *ppath = "/eos/user/f/falicant/shift/muon_regen";
+        *xLow = cell % 18 + 1;
+        *yLow = cell / 18 + 1;
+        *range = 4000;
     }
     else if (data == 1) { // Nue simulation (cell is event)
         // *path = "/Users/fabioali/cernbox/shift/nue_muon";
         // *opath = *path;
-        *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon1.3E5/b000021";
+        // *ppath = *opath;
+        *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_regenRUN1/b000021";
         *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_nue/%i", cell);
-        *ppath = *opath;
-        *nPlates = 60;
-        *stepZ = 1315;
+        *ppath = "/eos/user/f/falicant/shift/nue_regen";
+        *range = 0;
     }
     else if (data == 2) { // Real data
         // *path = "/Users/fabioali/cernbox/shift/b121";
@@ -77,10 +75,9 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         *path = TString::Format("/eos/experiment/sndlhc/emulsionData/emureco_%s/RUN%i/b%06i/cells", lab, run, brick);
         *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN%i/b%i/shift/%i", run, brick, cell);
         *ppath = TString::Format("/eos/user/f/falicant/RUN%i/brick%i/shifts", run, brick);
-        *nPlates = 57;
-        *stepZ = 1350;
         *xLow = cell % 18 + 1;
         *yLow = cell / 18 + 1;
+        *range = 4000;
     }
 }
 
@@ -106,51 +103,41 @@ void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, 
 }
 
 TH3F* loadH3(TFile *f) {
-    TH3F* h3 = (TH3F*)(f->Get("XYPseg"));
-    h3->SetDirectory(0);
+    TH3F *h3 = nullptr;
+    if (f) {
+        f->GetObject("XYPseg", h3);
+        h3->SetDirectory(0);
+    }
     return h3;
 }
 
-void openFiles(int cell, TFile** f) {
+void openFiles(int cell, TFile** f, TH3F** H3cell) {
     TString fileName = TString::Format("%s/b000021.0.0.%i.trk.root", path.Data(), cell+1);
     std::cout << fileName << std::endl;
     *f = TFile::Open(fileName);
+    *H3cell = loadH3(*f);
     setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
 }
 
 void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
     int idx = 0;
-    if (data == 0) {
-        for (int yCell = yLow-1; yCell <= yLow+1; yCell ++) {
-            for (int xCell = xLow-1; xCell <= xLow+1; xCell++) {
-                if (xCell < 1 || xCell > 19 || yCell < 1 || yCell > 19) f[idx] = nullptr;
-                else {
-                    int iCell = (yCell-1)*21 + (xCell-1);
-                    TString histFile = TString::Format("%s/%i/b000021/b000021.0.0.0.trk.root", path.Data(), iCell);
-                    std::cout << histFile << std::endl;
-                    f[idx] = TFile::Open(histFile);
-                }
-                idx++;   
+    for (int yCell = yLow-1; yCell <= yLow+1; yCell ++) {
+        for (int xCell = xLow-1; xCell <= xLow+1; xCell++) {
+            if (xCell < 1 || xCell > 18 || yCell < 1 || yCell > 18) {
+                f[idx] = nullptr;
+                H3cells[idx] = nullptr;
             }
-        }
-    }
-    else if (data == 2) {
-        for (int yCell = yLow-1; yCell <= yLow+1; yCell ++) {
-            for (int xCell = xLow-1; xCell <= xLow+1; xCell++) {
-                if (xCell < 1 || xCell > 18 || yCell < 1 || yCell > 18) f[idx] = nullptr;
-                else {
-                    TString histFile = TString::Format("%s/cell_%i0_%i0/b000021/b000021.0.0.0.trk.root", path.Data(), xCell, yCell);
-                    // std::cout << histFile << std::endl;
-                    f[idx] = TFile::Open(histFile);
-                    H3cells[idx] = loadH3(f[idx]);
-                }
-                idx++;   
+            else {
+                TString histFile = TString::Format("%s/cell_%i0_%i0/b000021/b000021.0.0.0.trk.root", path.Data(), xCell, yCell);
+                // std::cout << histFile << std::endl;
+                f[idx] = TFile::Open(histFile);
+                H3cells[idx] = loadH3(f[idx]);
             }
+            idx++;   
         }
     }
     setRanges(cell, &f[4], &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
 }
-
 
 TH2F* projectHist(TH3F* h3, int plate) {
     h3->GetEntries();
@@ -159,10 +146,9 @@ TH2F* projectHist(TH3F* h3, int plate) {
     return h2;
 }
 
-TH2F* matrixCells(TFile* f, int plate, double shiftX, double shiftY) {
+TH2F* matrixCells(TH3F* h3, int plate, double shiftX, double shiftY) {
     TH2F* hm = new TH2F(histName, histName, xBins, xMin, xMax, yBins, yMin, yMax);
-    // TH2F* h2 = projectHist(f, plate);
-    TH2F* h2; //fix for mc
+    TH2F* h2 = projectHist(h3, plate);
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
         double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
         if (xCenter > xMax && xCenter < xMin) continue;
@@ -204,10 +190,10 @@ TH2F* matrixCells(TFile* f[9],  TH3F* H3cells[9], int plate, double shiftX, doub
 
 TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName) {
     TFile *f, *ff[9];
-    TH3F *H3cells[9];
+    TH3F *H3cell, *H3cells[9]; //initialize empty pointers
 
     if (data == 1) {
-        openFiles(cell, &f);
+        openFiles(cell, &f, &H3cell);
     }
     else {
         openFiles(data, cell, &ff[0], &H3cells[0]);
