@@ -32,7 +32,7 @@ const int run = 1;
 const int brick = 121;
 
 // Parameters
-bool print = true;
+bool print = false;
 const int binSize    = 50;   // (um)
 const int shiftRange = 50;   // (mrad)
 const int shiftStep  = 2;    // (mrad)
@@ -60,12 +60,12 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         *range = 4000;
     }
     else if (data == 1) { // Nue simulation (cell is event)
-        // *path = "/Users/fabioali/cernbox/shift/nue_muon";
-        // *opath = *path;
-        // *ppath = *opath;
-        *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_regenRUN1/b000021";
-        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_nue/%i", cell);
-        *ppath = "/eos/user/f/falicant/shift/nue_regen";
+        *path = "/Users/fabioali/cernbox/shift/nue_muon";
+        *opath = *path;
+        *ppath = *opath;
+        // *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_regenRUN1/b000021";
+        // *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_nue/%i", cell);
+        // *ppath = "/eos/user/f/falicant/shift/nue_regen";
         *range = 0;
     }
     else if (data == 2) { // Real data
@@ -214,7 +214,7 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
         
         *histName = TString::Format("XYseg_%d", plate);
         
-        if (data == 1) hm[layer] = matrixCells(f, plate, shiftX, shiftY);
+        if (data == 1) hm[layer] = matrixCells(H3cell, plate, shiftX, shiftY);
         else hm[layer] = matrixCells(&ff[0], &H3cells[0], plate, shiftX, shiftY);
         
         hComb->Add(hm[layer]);
@@ -376,7 +376,7 @@ int main(int argc, char* argv[]) {
     TStopwatch stopWatch;
     stopWatch.Start();
 
-    getPath(data, &path, &opath, &ppath, cell, &nPlates, &xLow, &yLow, &stepZ);
+    getPath(data, &path, &opath, &ppath, cell, &xLow, &yLow, &range);
     
     gStyle->SetOptStat(0);
     TH2::AddDirectory(false);
@@ -384,7 +384,6 @@ int main(int argc, char* argv[]) {
 
     if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
     // std::cout << "Combination " << combination << std::endl;
-    
     TH2F* hComb = stackHist(data, combination, cell, &hm[0], &histName);
  
     TCanvas *c = new TCanvas("c", "c", 800, 800);
@@ -429,6 +428,6 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Time: " << stopWatch.RealTime() << std::endl;
     printMemoryInfo();
-
+ 
     return 0;
 }
