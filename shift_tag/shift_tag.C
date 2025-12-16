@@ -40,7 +40,7 @@ const int radius     = 200;  // (um)
 const int ntag = 50;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 const int nPlates = 57;
-const int stepZ = 1315;
+const int stepZ = 1350;
 int range;
 float bkg = 0;
 TString path;
