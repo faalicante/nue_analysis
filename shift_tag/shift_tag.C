@@ -36,11 +36,11 @@ bool print = false;
 const int binSize    = 50;   // (um)
 const int shiftRange = 50;   // (mrad)
 const int shiftStep  = 2;    // (mrad)
-const int radius     = 300;  // (um)
+const int radius     = 200;  // (um)
 const int ntag = 50;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 const int nPlates = 57;
-const int stepZ = 1350;
+const int stepZ = 1315;
 int range;
 float bkg = 0;
 TString path;
@@ -60,12 +60,12 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         *range = 4000;
     }
     else if (data == 1) { // Nue simulation (cell is event)
-        *path = "/Users/fabioali/cernbox/shift/nue_muon";
-        *opath = *path;
-        *ppath = *opath;
-        // *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_regenRUN1/b000021";
-        // *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_nue/%i", cell);
-        // *ppath = "/eos/user/f/falicant/shift/nue_regen";
+        // *path = "/Users/fabioali/cernbox/shift/nue_muon";
+        // *opath = *path;
+        // *ppath = *opath;
+        *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_regenRUN1/b000021";
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_nue/%i", cell);
+        *ppath = "/eos/user/f/falicant/shift/nue_regen";
         *range = 0;
     }
     else if (data == 2) { // Real data
@@ -113,7 +113,7 @@ TH3F* loadH3(TFile *f) {
 
 void openFiles(int cell, TFile** f, TH3F** H3cell) {
     TString fileName = TString::Format("%s/b000021.0.0.%i.trk.root", path.Data(), cell+1);
-    std::cout << fileName << std::endl;
+    // std::cout << fileName << std::endl;
     *f = TFile::Open(fileName);
     *H3cell = loadH3(*f);
     setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
@@ -151,16 +151,17 @@ TH2F* matrixCells(TH3F* h3, int plate, double shiftX, double shiftY) {
     TH2F* h2 = projectHist(h3, plate);
     for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
         double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
-        if (xCenter > xMax && xCenter < xMin) continue;
+        if (xCenter > xMax || xCenter < xMin) continue;
         for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
             double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-            if (yCenter > yMax && yCenter < yMin) continue;
+            if (yCenter > yMax || yCenter < yMin) continue;
             double content = h2->GetBinContent(xBin, yBin);
             int xBinNew = hm->GetXaxis()->FindBin(xCenter);
             int yBinNew = hm->GetYaxis()->FindBin(yCenter);
             hm->SetBinContent(xBinNew, yBinNew, content);
         }
     }
+    delete h2;
     return hm;
 }
 
@@ -175,7 +176,7 @@ TH2F* matrixCells(TFile* f[9],  TH3F* H3cells[9], int plate, double shiftX, doub
             if (xCenter > xMax || xCenter < xMin) continue;
             for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
                 double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-                if (yCenter > yMax && yCenter < yMin) continue;
+                if (yCenter > yMax || yCenter < yMin) continue;
                 double content = h2->GetBinContent(xBin, yBin);
                 if (content <= 0) continue;
                 int xBinNew = hm->GetXaxis()->FindBin(xCenter);
@@ -188,17 +189,7 @@ TH2F* matrixCells(TFile* f[9],  TH3F* H3cells[9], int plate, double shiftX, doub
     return hm;
 }
 
-TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName) {
-    TFile *f, *ff[9];
-    TH3F *H3cell, *H3cells[9]; //initialize empty pointers
-
-    if (data == 1) {
-        openFiles(cell, &f, &H3cell);
-    }
-    else {
-        openFiles(data, cell, &ff[0], &H3cells[0]);
-    }
-
+TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName, TH3F *H3cell) {
     double shiftTX = (combination % (shiftRange+1)) * shiftStep - shiftRange;
     double shiftTY = (combination / (shiftRange+1)) * shiftStep - shiftRange;
     // combination = (shiftTY + shiftRange)/shiftStep * (shiftRange + 1) + (shiftTX + shiftRange)/shiftStep
@@ -206,6 +197,7 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
     
     TH2F* hComb = new TH2F("XYseg", "XYseg", xBins, xMin, xMax, yBins, yMin, yMax);
     for (int layer = 0; layer < nPlates; ++layer) {
+        
         int plate = layer + 1;
         // std::cout << "Shifting plate " << plate << std::endl;
         
@@ -213,21 +205,10 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
         double shiftY = shiftTY / 1000.0 * stepZ * layer;
         
         *histName = TString::Format("XYseg_%d", plate);
-        
         if (data == 1) hm[layer] = matrixCells(H3cell, plate, shiftX, shiftY);
-        else hm[layer] = matrixCells(&ff[0], &H3cells[0], plate, shiftX, shiftY);
-        
+        // else hm[layer] = matrixCells(&ff[0], &H3cells[0], plate, shiftX, shiftY);
         hComb->Add(hm[layer]);
     }
-
-    if (data == 1) f->Close();
-    else {
-        for (int i = 0; i < 9; i++) {
-            if (ff[i] != nullptr) ff[i]->Close();
-            delete H3cells[i];
-        }
-    }
-
     return hComb;
 }
 
@@ -314,12 +295,10 @@ void count_bins(TH2F *h2, TObjArray &peaks, int plate, TH1F **h_long, float bkg)
     }
 }
 
-void makePlots(int cell, int combination, TCanvas *c, int np, int npmax, TH1F *h_long, int *maxPeak, int *maxPlate) {
+void makePlots(int cell, int combination, TCanvas *c, int np, int npmax, TH1F *h_long) {
     int idx = (np%3) +1;
     if (idx==1) c->Clear("D");
     c->cd(idx)->SetGrid(1,0);
-    *maxPeak = h_long->GetMaximum();
-    *maxPlate = h_long->GetMaximumBin();
     h_long->SetLineColor(1);
     h_long->SetLineWidth(2);
     h_long->Draw("hist");
@@ -330,104 +309,146 @@ void makePlots(int cell, int combination, TCanvas *c, int np, int npmax, TH1F *h
     }
 }
 
-void findStart(TH1F* h_long, int *firstPlate, int *lastPlate, int *nfound) {
+void findStart(TH1F* h_long, int *firstPlate, int *lastPlate, int *nfound, int *maxPeak, int *maxPlate) {
     float entries = h_long->GetMaximum();
+    *maxPeak = h_long->GetMaximum();
+    *maxPlate = h_long->GetMaximumBin();
     *firstPlate = h_long->FindFirstBinAbove(entries * 0.1);
     *lastPlate = h_long->FindLastBinAbove(entries * 0.1);
     TSpectrum *s = new TSpectrum(4);
     *nfound = s->Search(h_long, 5, "nobackground", 0.05);
 }
 
-void makeNtuple(int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
-    TString outputFileName = TString::Format("%s/peaks_%i_%i.root", opath.Data(), cell, combination);
-    TFile *outputFile = new TFile(outputFileName, "RECREATE");
-    TNtuple *ntuple = new TNtuple("showers","tagged showers","cell:combination:tag:x:y:start:end:peak:maxplate:nseg:nfound:rankbin");
-    TCanvas *c2 = new TCanvas("c2", "c2", 1500, 1500);
+void makeNtuple(TFile* outputFile, TNtuple* ntuple, int combination, int cell, TH1F **h_long, TObjArray &peaks, int *ranks) {
+    TString canvasName = TString::Format("c2_%i.root", combination);
+    TCanvas *c2 = new TCanvas(canvasName, canvasName, 1500, 1500);
     c2->Divide(1,3);
+
     int np = peaks.GetEntries();
     int entries, firstPlate, lastPlate, nfound, maxPeak, maxPlate;
-
+    
     for(int i=0; i<np; i++) {
         TEllipse *el = ((TEllipse*)(peaks.At(i)));
         float x = el->GetX1();
         float y = el->GetY1();
-        makePlots(cell, combination, c2, i, np, h_long[i], &maxPeak, &maxPlate);
-        findStart(h_long[i], &firstPlate, &lastPlate, &nfound);
+        if (print) makePlots(cell, combination, c2, i, np, h_long[i]);
+        findStart(h_long[i], &firstPlate, &lastPlate, &nfound, &maxPeak, &maxPlate);
         int nseg = h_long[i]->Integral(firstPlate, lastPlate);
         if (print) h_long[i]->Write();
         ntuple->Fill(cell, combination, i+1, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, nfound, ranks[i]);
     }
-    outputFile->Write();
-    outputFile->Close();
+    delete c2;
 }
 
 int main(int argc, char* argv[]) {
     gROOT->SetBatch(!print);
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <combination>" << argv[2] << " <cell>" << argv[3] << std::endl;
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <cell>" << argv[2] << std::endl;
         // data = {0: muon, 1: nue, 2: data}
         // cell for nue is event
         return 1;
     }
     int data = std::atoi(argv[1]);
-    int combination = std::atoi(argv[2]);
-    int cell = std::atoi(argv[3]);
-
+    int cell = std::atoi(argv[2]);
+    
     TStopwatch stopWatch;
     stopWatch.Start();
-
+    
     getPath(data, &path, &opath, &ppath, cell, &xLow, &yLow, &range);
     
+    TFile *f, *ff[9];
+    TH3F *H3cell, *H3cells[9];
+
+    if (data == 1) {
+        openFiles(cell, &f, &H3cell);
+    }
+    else {
+        openFiles(data, cell, &ff[0], &H3cells[0]);
+    }
+
     gStyle->SetOptStat(0);
-    TH2::AddDirectory(false);
-    TH2F* hm[nPlates];
-
-    if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
-    // std::cout << "Combination " << combination << std::endl;
-    TH2F* hComb = stackHist(data, combination, cell, &hm[0], &histName);
- 
-    TCanvas *c = new TCanvas("c", "c", 800, 800);
-    c->SetGrid();
-    hComb->Smooth();
-    hComb->Draw("colz");
-    c->Update();
-    if (print) c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
-    TObjArray peaks;
-    TObjArray txt;
-    int ranks[ntag];
-    get_peaks(*hComb,peaks,txt,ntag,ranks,bkg);
-    if (print) {
-        drawEllipse(peaks,txt, kBlack);
-        c->Update();
-        c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
-        hComb->GetZaxis()->SetRangeUser(bkg, hComb->GetMaximum());
-        c->Update();
-        c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
-    }
-
-    TH1F *h_long[ntag];
-    for(int i=0; i<ntag; i++) {
-        h_long[i] = new TH1F(Form("h_long_%i", i+1),Form("Cluster %i;plate;%%segments", i+1), 60, 1, 61);
-    }
     
-    for(int p=1; p<=nPlates; p++) { 
-        // printf("Tagging plate %i\n", p);
-        hm[p-1]->Smooth();
-        hm[p-1]->Draw("colz");
-        count_bins(hm[p-1], peaks, p, &h_long[0], bkg);
+    TString outputFileName = TString::Format("%s/peaks_%i_test.root", opath.Data(), cell);
+    TFile *outputFile = new TFile(outputFileName, "RECREATE");
+    TNtuple *ntuple = new TNtuple("showers","tagged showers","cell:combination:tag:x:y:start:end:peak:maxplate:nseg:nfound:rankbin");
+    
+    if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
+    TH2F* hComb;
+    TH2F *hm[nPlates];
+    TH2::AddDirectory(false);
+    for(int combination = 0; combination < ((shiftRange+1)*(shiftRange+1)); combination++) {
+        if (combination!=1294&&combination!=1293&&combination!=1300) continue;
+        stopWatch.Continue();
+        
+        std::cout << "Combination " << combination << std::endl;
+        
+        hComb = stackHist(data, combination, cell, &hm[0], &histName, H3cell);
+        TString canvasName = TString::Format("c_%i.root", combination);
+        TCanvas *c = new TCanvas(canvasName, canvasName, 800, 800);
+        hComb->Smooth();
+        if (print) {
+            c->SetGrid();
+            hComb->Draw("colz");
+            // c->Update();
+            c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
+        }
+        TObjArray peaks;
+        TObjArray txt;
+        int ranks[ntag];
+        get_peaks(*hComb,peaks,txt,ntag,ranks,bkg);
         if (print) {
             drawEllipse(peaks,txt, kBlack);
-            // hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
             c->Update();
-            c->Print(Form("%s/sh_%i_%i.gif+12", ppath.Data(), cell, combination));
+            c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
+            hComb->GetZaxis()->SetRangeUser(bkg, hComb->GetMaximum());
+            c->Update();
+            c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
+        }
+
+        TH1F *h_long[ntag];
+        for(int i=0; i<ntag; i++) {
+            h_long[i] = new TH1F(Form("h_long_%i", i+1),Form("Cluster %i;plate;%%segments", i+1), 60, 1, 61);
+        }
+        
+        for(int p=1; p<=nPlates; p++) { 
+            // printf("Tagging plate %i\n", p);
+            hm[p-1]->Smooth();
+            count_bins(hm[p-1], peaks, p, &h_long[0], bkg);
+            if (print) {
+                hm[p-1]->Draw("colz");
+                drawEllipse(peaks,txt, kBlack);
+                // hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
+                c->Update();
+                c->Print(Form("%s/sh_%i_%i.gif+12", ppath.Data(), cell, combination));
+            }
+        }
+        if (print) c->Print(Form("%s/sh_%i_%i.gif++", ppath.Data(), cell, combination));
+
+        makeNtuple(outputFile, ntuple, combination, cell, &h_long[0], peaks,ranks);
+
+        std::cout << "Time: " << round(stopWatch.RealTime()) << std::endl;
+        printMemoryInfo();
+        delete hComb;
+        delete c;
+        for(int p=1; p<=nPlates; p++) { 
+            delete hm[p-1];
+        }
+
+        
+        // delete[] hm;
+        std::cout << "---------------------" << std::endl;
+    }
+    if (data == 1) {
+        f->Close();
+        delete H3cell;
+    }
+    else {
+        for (int i = 0; i < 9; i++) {
+            if (ff[i] != nullptr) ff[i]->Close();
+            delete H3cells[i];
         }
     }
-    if (print) c->Print(Form("%s/sh_%i_%i.gif++", ppath.Data(), cell, combination));
-
-    makeNtuple(combination, cell, &h_long[0], peaks,ranks);
-
-    std::cout << "Time: " << stopWatch.RealTime() << std::endl;
-    printMemoryInfo();
- 
+    outputFile->Write();
+    outputFile->Close();
     return 0;
 }

@@ -26,16 +26,14 @@ def makeTMap(hTmap, peaks):
     output = ROOT.TFile.Open(f'peak_map_{cell}.root', 'RECREATE')
     outtree = ROOT.TNtuple("showers", "showers", "cell:combination:tag:tx:ty:x:y:p:peak")
     for px, py in zip(peak_x_coords, peak_y_coords):
-        # print(px,py)
         x = np.searchsorted(xedges, px)
         y = np.searchsorted(yedges, py)
         if (x,y) not in map: continue
         combination = map[(x,y)][1]
         ix = combination % nbins
         iy = combination // nbins
-        #if abs(ix-25)==4 or abs(iy-25)==4:
-            #print(map[(x,y)], ix-25, iy-25, px, py)
-        outtree.Fill(map[(x,y)][0], map[(x,y)][1], map[(x,y)][2], ix*2-50, iy*2-50, px, py, map[(x,y)][3], map[(x,y)][4])
+        if abs(px-xCenter)>5000 or abs(py-yCenter)>5000: continue
+        outtree.Fill(map[(x,y)][0], map[(x,y)][1], map[(x,y)][2], ix*2-50, iy*2-50, map[(x,y)][5], map[(x,y)][6], map[(x,y)][3], map[(x,y)][4])
         tx_coord = txedges[ix]
         ty_coord = tyedges[iy]
         peak_tx_coords.append(int(tx_coord)+1)
@@ -58,13 +56,13 @@ def makeTMap(hTmap, peaks):
     return peak_tx_coords, peak_ty_coords
 
 def makeMap(hmap):
-    smoothed_hist = gaussian_filter(hmap, sigma=1)
+    smoothed_hist = gaussian_filter(hmap, sigma=0)
     peaks = peak_local_max(smoothed_hist, min_distance=2, threshold_abs=0)
     peak_x_coords = xedges[peaks[:, 0]]
     peak_y_coords = yedges[peaks[:, 1]]
     plt.figure(figsize=(8, 6))
     plt.imshow(smoothed_hist.T, origin='lower',extent=[xCenter-xRange, xCenter+xRange, yCenter-xRange, yCenter+xRange],cmap='viridis', interpolation='none')
-    plt.plot(peak_x_coords+xStep/2, peak_y_coords+xStep/2, 'r.', markersize=5, label='Peaks')
+    plt.plot(peak_x_coords+xStep/2, peak_y_coords+xStep/2, 'r.', markersize=2, label='Peaks')
     # plt.plot(xedg,yedg, 'r.', markersize=5, label='Peaks')
     plt.colorbar(label='Counts')
     plt.title('2D Histogram with Detected Peaks')
@@ -82,31 +80,25 @@ def makeMap(hmap):
 shiftRange = 50  #mrad
 shiftStep  = 2   #mrad
 nbins      = int((shiftRange * 2)/shiftStep) + 1
-xRange = 6000  #um
-if data==0:
-    xcell = cell%21
-    ycell = cell//21
-    xCenter = (xcell-0.5)*10000 + 200000
-    yCenter = (ycell-0.5)*10000 - 5000
-    dz = 1315
-elif data==1:
-    dz = 1315
-    with open ('nue_int_1.txt', 'r') as f:
+dz = 1350
+if data==1:
+    xRange = 6000
+    with open ('nue_int_100.txt', 'r') as f:
         lines = f.readlines()
         line = lines[cell].strip().split(",")
-        xCenter = float(line[2])
-        yCenter = float(line[3])
-elif data==2:
-    dz = 1350
+        xCenter = float(line[3])
+        yCenter = float(line[4])
+else:
+    xRange = 10000  #um
     xcell = cell%18
     ycell = cell//18
     xCenter = (xcell+1)*10000
     yCenter = (ycell+1)*10000
 # xOffset = 288000      #um
 # yOffset = 83000      #um
-xStep  = 150     #um
+xStep  = 100     #um
 nxbins = int(2*xRange/xStep)
-nTag = 30
+nTag = 50
 
 # File
 # path = f'/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/{cell}/peaks.root'
@@ -140,9 +132,11 @@ for entry in showers:
     plate = entry.maxplate
     projx = entry.x - tx/1000 * ((plate-1) * dz)
     projy = entry.y - ty/1000 * ((plate-1) * dz)
-    if abs(projx-xCenter)>5000 or abs(projy-yCenter)>5000: continue
+    if abs(projx-xCenter)>xRange or abs(projy-yCenter)>xRange: continue
     x = int((projx - xCenter + xRange) // xStep)
     y = int((projy - yCenter + xRange) // xStep)
+    # if (combination==1293 and tag==1):
+    #     print(plate, tag, x, y, tx, ty, projx, entry.x, entry.y, peak, hmap[x,y], map[(x, y)])
     # if abs(x-2)<3 or abs(x-nxbins+2)<3 or abs(y-2)<3 or abs(y-nxbins+2)<3 : continue
     # if ROOT.TMath.Sqrt((ix-25)**2+(iy-25)**2)<7: continue
     # if combination != 1234: continue
@@ -150,7 +144,9 @@ for entry in showers:
         hTmap[ix, iy] = peak
     if peak > hmap[x,y]:
         hmap[x,y] = peak
-        map[(x, y)] = (entry.cell, combination, tag, entry.start, peak)
+        map[(x, y)] = (entry.cell, combination, tag, entry.start, peak, entry.x, entry.y)
+# print(map[(67,59)])
+
 
 peaks = makeMap(hmap)
 peaksT = makeTMap(hTmap, peaks)
