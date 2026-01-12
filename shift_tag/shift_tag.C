@@ -12,6 +12,8 @@
 #include "TStyle.h"
 #include "TSpectrum.h"
 #include "TMath.h"
+#include "TLegend.h"
+#include "TF1.h"
 #include <iostream>
 #include <filesystem>
 #include <map>
@@ -34,10 +36,10 @@ const int brick = 121;
 // Parameters
 bool print = false;
 const int binSize    = 50;   // (um)
-const int shiftRange = 50;   // (mrad)
+const int shiftRange = 50;   // (mrad) //enlarge with bigger step
 const int shiftStep  = 2;    // (mrad)
 const int radius     = 200;  // (um)
-const int ntag = 50;
+const int ntag = 100;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 const int nPlates = 57;
 const int stepZ = 1350;
@@ -60,11 +62,11 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         *range = 4000;
     }
     else if (data == 1) { // Nue simulation (cell is event)
-        // *path = "/Users/fabioali/cernbox/shift/nue_muon";
+        // *path = "/Users/fabioali/cernbox/shift/nue_regen";
         // *opath = *path;
         // *ppath = *opath;
         *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_regenRUN1/b000021";
-        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_nue/%i", cell);
+        *opath = "/eos/experiment/sndlhc/users/falicant/shift_nue_regen_100";
         *ppath = "/eos/user/f/falicant/shift/nue_regen";
         *range = 0;
     }
@@ -73,7 +75,7 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         // *opath = *path;
         // *ppath = *opath;
         *path = TString::Format("/eos/experiment/sndlhc/emulsionData/emureco_%s/RUN%i/b%06i/cells", lab, run, brick);
-        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN%i/b%i/shift/%i", run, brick, cell);
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN%i/b%i/shift", run, brick, cell);
         *ppath = TString::Format("/eos/user/f/falicant/RUN%i/brick%i/shifts", run, brick);
         *xLow = cell % 18 + 1;
         *yLow = cell / 18 + 1;
@@ -81,7 +83,7 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
     }
 }
 
-void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, int* xBins, int* yBins, float* bkg) {
+void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, int* xBins, int* yBins) {
     TH2F* h2 = (TH2F*)((*f)->Get("XYseg"));
     int fax = h2->FindFirstBinAbove(0,1);
     int fay = h2->FindFirstBinAbove(0,2);
@@ -93,12 +95,6 @@ void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, 
     *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + range;
     *xBins = int((*xMax - *xMin) / binSize);
     *yBins = int((*yMax - *yMin) / binSize);
-    int xBinsBkg = int((*xMax - *xMin - range*2) / binSize);
-    int yBinsBkg = int((*yMax - *yMin - range*2) / binSize);
-    double mean = h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
-    *bkg = mean + 5 * TMath::Sqrt(mean); // poissonian
-    // *bkg = 1.5 * h2->Integral(fax, lax, fay, lay) / xBinsBkg / yBinsBkg;
-    std::cout << "Average background " << *bkg << std::endl;
     delete h2;
 }
 
@@ -111,12 +107,56 @@ TH3F* loadH3(TFile *f) {
     return h3;
 }
 
+TH2F* loadH2(TFile *f) {
+    TH2F *h2 = nullptr;
+    if (f) {
+        f->GetObject("XYseg", h2);
+        h2->SetDirectory(0);
+    }
+    return h2;
+}
+
+TH1F* drawSpectrum(TH2F *h2) {
+    int nBinsX = h2->GetNbinsX();
+    int nBinsY = h2->GetNbinsY();
+    TH1F* hSpec = new TH1F("hSpec", "Spectrum;rankbin", 200, 0, 1000);
+    for (int i = 1; i <= nBinsX; ++i) {
+        for (int j = 1; j <= nBinsY; ++j) {
+            int content = h2->GetBinContent(i, j);
+            if (content > 0) hSpec->Fill(content);
+        }
+    }
+    return hSpec;
+}
+
+TF1* fitBackground(TH1F* h, float *bkg) {
+    float maxBin = h->GetXaxis()->GetBinCenter(h->GetMaximumBin());
+    TF1 *f = new TF1("f", "gaus(0)+ [3]*exp(-[4]*(x-[1]))/(1+exp(-[5]*(x-[1])))", maxBin-200,maxBin+500); 
+    f->SetParameters(
+        h->Integral(),     // Gaussian amplitude
+        maxBin,            // peak position
+        50,                // sigma
+        h->Integral(),     // exponential amplitudes
+        0.005              // decay constant
+    );
+    f->SetParLimits(2, 1, 500);   // sigma > 0
+    f->SetParLimits(4, 1e-5, 1);  // lambda > 0
+    h->Fit(f, "RMQ");
+    *bkg = f->GetParameter(1)+5*f->GetParameter(2);
+    std::cout << "Fitted background: " << *bkg << std::endl;
+    return f;
+}
+
 void openFiles(int cell, TFile** f, TH3F** H3cell) {
     TString fileName = TString::Format("%s/b000021.0.0.%i.trk.root", path.Data(), cell+1);
     // std::cout << fileName << std::endl;
     *f = TFile::Open(fileName);
     *H3cell = loadH3(*f);
-    setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
+    TH2F* H2cell = loadH2(*f);
+    H2cell->Smooth();
+    TH1F* hSpec2 = drawSpectrum(H2cell);
+    TF1* fit = fitBackground(hSpec2, &bkg);
+    setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins);
 }
 
 void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
@@ -136,7 +176,11 @@ void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
             idx++;   
         }
     }
-    setRanges(cell, &f[4], &xMin, &xMax, &yMin, &yMax, &xBins, &yBins, &bkg);
+    TH2F* H2cell = loadH2(f[4]);
+    H2cell->Smooth();
+    TH1F* hSpec2 = drawSpectrum(H2cell);
+    TF1* fit = fitBackground(hSpec2, &bkg);
+    setRanges(cell, &f[4], &xMin, &xMax, &yMin, &yMax, &xBins, &yBins);
 }
 
 TH2F* projectHist(TH3F* h3, int plate) {
@@ -205,8 +249,29 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
         double shiftY = shiftTY / 1000.0 * stepZ * layer;
         
         *histName = TString::Format("XYseg_%d", plate);
-        if (data == 1) hm[layer] = matrixCells(H3cell, plate, shiftX, shiftY);
-        // else hm[layer] = matrixCells(&ff[0], &H3cells[0], plate, shiftX, shiftY);
+        hm[layer] = matrixCells(H3cell, plate, shiftX, shiftY);
+        hComb->Add(hm[layer]);
+    }
+    return hComb;
+}
+
+TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName, TFile* ff[9], TH3F* H3cells[9]) {
+    double shiftTX = (combination % (shiftRange+1)) * shiftStep - shiftRange;
+    double shiftTY = (combination / (shiftRange+1)) * shiftStep - shiftRange;
+    // combination = (shiftTY + shiftRange)/shiftStep * (shiftRange + 1) + (shiftTX + shiftRange)/shiftStep
+    // std::cout << "Shift TX: " << shiftTX << " mrad, Shift TY: " << shiftTY << " mrad" << std::endl;
+    
+    TH2F* hComb = new TH2F("XYseg", "XYseg", xBins, xMin, xMax, yBins, yMin, yMax);
+    for (int layer = 0; layer < nPlates; ++layer) {
+        
+        int plate = layer + 1;
+        // std::cout << "Shifting plate " << plate << std::endl;
+        
+        double shiftX = shiftTX / 1000.0 * stepZ * layer;
+        double shiftY = shiftTY / 1000.0 * stepZ * layer;
+        
+        *histName = TString::Format("XYseg_%d", plate);
+        hm[layer] = matrixCells(&ff[0], &H3cells[0], plate, shiftX, shiftY);
         hComb->Add(hm[layer]);
     }
     return hComb;
@@ -240,12 +305,13 @@ int getMax(TH2F &h2, TObjArray &peaks, TObjArray &txt, float bkg) {
     return 0;
 }
 
-void get_peaks(TH2F &h2, TObjArray &peaks, TObjArray &txt, int npmax, int *ranks, float bkg) {
+TH2F* get_peaks(TH2F &h2, TObjArray &peaks, TObjArray &txt, int npmax, int *ranks, float bkg) {
     TH2F *h2new = (TH2F*)h2.Clone("get_peaks");
     for(int i=0; i<npmax; i++){
         int rankbin = getMax(*h2new, peaks, txt, bkg);
         ranks[i] = rankbin;
     }
+    return h2new;
 }
 
 void drawEllipse(TObjArray &peaks, TObjArray &txt, int col) {
@@ -335,10 +401,12 @@ void makeNtuple(TFile* outputFile, TNtuple* ntuple, int combination, int cell, T
         findStart(h_long[i], &firstPlate, &lastPlate, &nfound, &maxPeak, &maxPlate);
         int nseg = h_long[i]->Integral(firstPlate, lastPlate);
         if (print) h_long[i]->Write();
-        ntuple->Fill(cell, combination, i+1, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, nfound, ranks[i]);
+        ntuple->Fill(cell, combination, i+1, x, y, firstPlate, lastPlate, maxPeak, maxPlate, nseg, nfound, ranks[i], bkg);
     }
     delete c2;
 }
+
+
 
 int main(int argc, char* argv[]) {
     gROOT->SetBatch(!print);
@@ -368,35 +436,47 @@ int main(int argc, char* argv[]) {
 
     gStyle->SetOptStat(0);
     
-    TString outputFileName = TString::Format("%s/peaks_%i_test.root", opath.Data(), cell);
+    TString outputFileName = TString::Format("%s/peaks_%i.root", opath.Data(), cell);
     TFile *outputFile = new TFile(outputFileName, "RECREATE");
-    TNtuple *ntuple = new TNtuple("showers","tagged showers","cell:combination:tag:x:y:start:end:peak:maxplate:nseg:nfound:rankbin");
+    TNtuple *ntuple = new TNtuple("showers","tagged showers","cell:combination:tag:x:y:start:end:peak:maxplate:nseg:nfound:rankbin:bkg");
     
-    if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
+    // if (!std::filesystem::exists(opath.Data())) std::filesystem::create_directory(opath.Data());
     TH2F* hComb;
+    TH2F* hProc;
     TH2F *hm[nPlates];
     TH2::AddDirectory(false);
     for(int combination = 0; combination < ((shiftRange+1)*(shiftRange+1)); combination++) {
-        if (combination!=1294&&combination!=1293&&combination!=1300) continue;
+        if (combination!=1300) continue;
         stopWatch.Continue();
         
         std::cout << "Combination " << combination << std::endl;
         
-        hComb = stackHist(data, combination, cell, &hm[0], &histName, H3cell);
+        if (data == 1) hComb = stackHist(data, combination, cell, &hm[0], &histName, H3cell);
+        else hComb = stackHist(data, combination, cell, &hm[0], &histName, &ff[0], &H3cells[0]);
         TString canvasName = TString::Format("c_%i.root", combination);
         TCanvas *c = new TCanvas(canvasName, canvasName, 800, 800);
+        TH1F* hSpec1, *hSpec2, *hSpec3;
+        if (print) {
+            hSpec1 = drawSpectrum(hComb);
+            hSpec1->SetLineColor(kBlue);
+        }
         hComb->Smooth();
         if (print) {
+            hSpec2 = drawSpectrum(hComb);
+            hSpec2->SetLineColor(kGreen);
+            // TF1* fit = fitBackground(hSpec2, &bkg);
             c->SetGrid();
             hComb->Draw("colz");
-            // c->Update();
+            c->Update();
             c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
         }
         TObjArray peaks;
         TObjArray txt;
         int ranks[ntag];
-        get_peaks(*hComb,peaks,txt,ntag,ranks,bkg);
+        hProc = get_peaks(*hComb,peaks,txt,ntag,ranks,bkg);
         if (print) {
+            hSpec3 = drawSpectrum(hProc);
+            hSpec3->SetLineColor(kRed);
             drawEllipse(peaks,txt, kBlack);
             c->Update();
             c->Print(Form("%s/sh_%i_%i.gif+180", ppath.Data(), cell, combination));
@@ -413,9 +493,9 @@ int main(int argc, char* argv[]) {
         for(int p=1; p<=nPlates; p++) { 
             // printf("Tagging plate %i\n", p);
             hm[p-1]->Smooth();
+            hm[p-1]->Draw("colz");
             count_bins(hm[p-1], peaks, p, &h_long[0], bkg);
             if (print) {
-                hm[p-1]->Draw("colz");
                 drawEllipse(peaks,txt, kBlack);
                 // hm[p-1]->GetZaxis()->SetRangeUser(static_cast<int>(std::ceil((double)bkg/nPlates)), hm[p-1]->GetMaximum());
                 c->Update();
@@ -434,8 +514,26 @@ int main(int argc, char* argv[]) {
             delete hm[p-1];
         }
 
-        
-        // delete[] hm;
+        if (print) {
+            TString canvasNameSp = TString::Format("csp_%i.root", combination);
+            TCanvas *cSp = new TCanvas(canvasNameSp, canvasNameSp, 800, 600);
+            cSp->cd()->SetLogy();
+            cSp->SetGrid();
+            hSpec3->Draw("hist ");
+            hSpec2->Draw("hist same");
+            hSpec1->Draw("hist same");
+            // fit->Draw("same"); //TLine for bkg
+            TLegend *leg = new TLegend(0.6,0.7,0.9,0.9);
+            leg->AddEntry(hSpec1, "Original", "l");
+            leg->AddEntry(hSpec2, "Smoothed", "l");
+            leg->AddEntry(hSpec3, "After peak search", "l");
+            leg->Draw();
+            cSp->Print(Form("%s/spectrum_%i_%i.pdf", ppath.Data(), cell, combination), "pdf");
+            delete cSp;
+            delete hSpec1;
+            delete hSpec2;
+            delete hSpec3;
+        }
         std::cout << "---------------------" << std::endl;
     }
     if (data == 1) {
