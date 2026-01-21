@@ -75,7 +75,7 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         // *opath = *path;
         // *ppath = *opath;
         *path = TString::Format("/eos/experiment/sndlhc/emulsionData/emureco_%s/RUN%i/b%06i/cells", lab, run, brick);
-        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN%i/b%i/shift", run, brick, cell);
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/RUN%i/b%i/shift", run, brick);
         *ppath = TString::Format("/eos/user/f/falicant/RUN%i/brick%i/shifts", run, brick);
         *xLow = cell % 18 + 1;
         *yLow = cell / 18 + 1;
@@ -83,7 +83,7 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
     }
 }
 
-void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, int* xBins, int* yBins) {
+TH2F* setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, int* xBins, int* yBins) {
     TH2F* h2 = (TH2F*)((*f)->Get("XYseg"));
     int fax = h2->FindFirstBinAbove(0,1);
     int fay = h2->FindFirstBinAbove(0,2);
@@ -95,7 +95,9 @@ void setRanges(int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, 
     *yMax = (int)(h2->GetYaxis()->GetBinUpEdge(lay)) + range;
     *xBins = int((*xMax - *xMin) / binSize);
     *yBins = int((*yMax - *yMin) / binSize);
-    delete h2;
+    h2->GetXaxis()->SetRangeUser(*xMin, *xMax);
+    h2->GetYaxis()->SetRangeUser(*yMin, *yMax);
+    return h2;
 }
 
 TH3F* loadH3(TFile *f) {
@@ -129,9 +131,15 @@ TH1F* drawSpectrum(TH2F *h2) {
     return hSpec;
 }
 
+void poisBkg(TH1F* h, float *bkg) {
+    float mpv = h->GetBinCenter(h->GetMaximumBin());
+    *bkg = mpv+5*std::sqrt(mpv);
+    std::cout << "Poisson background: " << *bkg << std::endl;
+}
+
 TF1* fitBackground(TH1F* h, float *bkg) {
     float maxBin = h->GetXaxis()->GetBinCenter(h->GetMaximumBin());
-    TF1 *f = new TF1("f", "gaus(0)+ [3]*exp(-[4]*(x-[1]))/(1+exp(-[5]*(x-[1])))", maxBin-200,maxBin+500); 
+    TF1 *f = new TF1("f", "gaus(0)+ [3]*exp(-[4]*(x-[1]))/(1+exp(-[5]*(x-[1])))", maxBin-100,maxBin+300); 
     f->SetParameters(
         h->Integral(),     // Gaussian amplitude
         maxBin,            // peak position
@@ -139,11 +147,16 @@ TF1* fitBackground(TH1F* h, float *bkg) {
         h->Integral(),     // exponential amplitudes
         0.005              // decay constant
     );
-    f->SetParLimits(2, 1, 500);   // sigma > 0
-    f->SetParLimits(4, 1e-5, 1);  // lambda > 0
+    f->SetParLimits(2, 1, 300);   // sigma > 0
+    // f->SetParLimits(4, 1e-5, 1);  // lambda > 0
     h->Fit(f, "RMQ");
     *bkg = f->GetParameter(1)+5*f->GetParameter(2);
     std::cout << "Fitted background: " << *bkg << std::endl;
+    TCanvas *c = new TCanvas("c_fit", "c_fit", 800, 600);
+    c->cd()->SetLogy();
+    h->Draw();
+    f->Draw("same");
+    c->Print(Form("%s/fit_background.pdf", ppath.Data()), "pdf");
     return f;
 }
 
@@ -151,12 +164,13 @@ void openFiles(int cell, TFile** f, TH3F** H3cell) {
     TString fileName = TString::Format("%s/b000021.0.0.%i.trk.root", path.Data(), cell+1);
     // std::cout << fileName << std::endl;
     *f = TFile::Open(fileName);
+    TH2F* H2cell = setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins);
     *H3cell = loadH3(*f);
-    TH2F* H2cell = loadH2(*f);
+    // TH2F* H2cell = loadH2(*f);
     H2cell->Smooth();
     TH1F* hSpec2 = drawSpectrum(H2cell);
-    TF1* fit = fitBackground(hSpec2, &bkg);
-    setRanges(cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins);
+    //TF1* fit = fitBackground(hSpec2, &bkg);
+    poisBkg(hSpec2, &bkg);
 }
 
 void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
@@ -453,7 +467,7 @@ int main(int argc, char* argv[]) {
         
         if (data == 1) hComb = stackHist(data, combination, cell, &hm[0], &histName, H3cell);
         else hComb = stackHist(data, combination, cell, &hm[0], &histName, &ff[0], &H3cells[0]);
-        TString canvasName = TString::Format("c_%i.root", combination);
+        TString canvasName = TString::Format("c_%i", combination);
         TCanvas *c = new TCanvas(canvasName, canvasName, 800, 800);
         TH1F* hSpec1, *hSpec2, *hSpec3;
         if (print) {
@@ -515,7 +529,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (print) {
-            TString canvasNameSp = TString::Format("csp_%i.root", combination);
+            TString canvasNameSp = TString::Format("csp_%i", combination);
             TCanvas *cSp = new TCanvas(canvasNameSp, canvasNameSp, 800, 600);
             cSp->cd()->SetLogy();
             cSp->SetGrid();
