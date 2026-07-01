@@ -36,8 +36,9 @@ bool print = true;
 const int binSize    = 50;   // (um)
 const int radius     = 200;  // (um)
 const int ntag = 10;
-int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 const int nPlates = 57;
+const int dz = 1350;
+int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 int range;
 float bkg = 0;
 TString path;
@@ -63,7 +64,7 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_Euniform_RUN1_FLUKA25/b000021";
         *opath = "/eos/experiment/sndlhc/users/falicant/RNN/signal";
         *ppath = TString::Format("%s/%i", opath->Data(), cell);
-        *range = 1000;
+        *range = 500;
     }
     else if (data == 2) { // Real data
         // *path = "/Users/fabioali/cernbox/shift/b121";
@@ -81,20 +82,20 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
 TH2F* setRanges1(int data, int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, int* xBins, int* yBins) {
     TH2F* h2 = (TH2F*)((*f)->Get("XYseg"));
     int fax, fay, lax, lay;
-    if (data==1) {
-        int nbinsX = h2->GetNbinsX();
-        int nbinsY = h2->GetNbinsY();
-        fax = nbinsX / 2;
-        fay = nbinsY / 2;
-        lax = fax;
-        lay = fay;
-    }
-    else {
+    // if (data==1) {
+    //     int nbinsX = h2->GetNbinsX();
+    //     int nbinsY = h2->GetNbinsY();
+    //     fax = nbinsX / 2;
+    //     fay = nbinsY / 2;
+    //     lax = fax;
+    //     lay = fay;
+    // }
+    // else {
         fax = h2->FindFirstBinAbove(0,1);
         fay = h2->FindFirstBinAbove(0,2);
         lax = h2->FindLastBinAbove(0,1);
         lay = h2->FindLastBinAbove(0,2);
-    }
+    // }
 
     *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - range;
     *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + range;
@@ -309,7 +310,7 @@ double findColScale(TH2F **hm) {
 
 void printBW (TH2F **hm, int cell, double zScale, int tag) {
     if (!std::filesystem::exists(ppath.Data())) std::filesystem::create_directory(ppath.Data());
-    if (!std::filesystem::exists(TString::Format("%s/%i", ppath.Data(), tag).Data())) {
+    if (!std::filesystem::exists(TString::Format("%s/%i", ppath.Data(), tag).Data())&&tag>0) {
         std::filesystem::create_directory(TString::Format("%s/%i", ppath.Data(), tag).Data());
     }
     TString imgName;
@@ -327,13 +328,39 @@ void printBW (TH2F **hm, int cell, double zScale, int tag) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
+    if (argc < 3) {
         std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <cell>" << argv[2] << std::endl;
         // data = {0: muon, 1: nue, 2: data}
         // cell for nue is event
     }
     int data = std::atoi(argv[1]);
     int cell = std::atoi(argv[2]);
+    
+    // for neutrino only
+    double xn, yn, txn, tyn;
+    int pn;
+    for (int i = 3; i < argc; ++i) {
+        std::string arg = argv[i];
+
+        if (arg == "--x0" && i + 1 < argc) {
+            xn = std::stod(argv[++i]);
+        }
+        else if (arg == "--y0" && i + 1 < argc) {
+            yn = std::stod(argv[++i]);
+        }
+        else if (arg == "--tx" && i + 1 < argc) {
+            txn = std::stod(argv[++i]);
+        }
+        else if (arg == "--ty" && i + 1 < argc) {
+            tyn = std::stod(argv[++i]);
+        }
+        else if (arg == "--p0" && i + 1 < argc) {
+            pn = std::atoi(argv[++i]);
+        }
+        else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+        }
+    }
     
     TStopwatch stopWatch;
     stopWatch.Start();
@@ -345,6 +372,7 @@ int main(int argc, char* argv[]) {
     gStyle->SetPalette(52);
     gStyle->SetTitleSize(0, "XYZ");
     gStyle->SetLabelSize(0, "XYZ");
+    gStyle->SetTickLength(0, "XYZ");
     gStyle->SetFrameLineWidth(0);
     gStyle->SetPadLeftMargin(0);
     gStyle->SetPadRightMargin(0);
@@ -391,13 +419,16 @@ int main(int argc, char* argv[]) {
             float y0 = el->GetY1();
             std::cout << "Peak " << j+1 << ": x = " << x0 << ", y = " << y0 << std::endl;
             setRanges2(&hm[0], x0, y0);
-            double zScale = findColScale(&hm[0]);
-            printBW(&hm[0], cell, zScale, j+1);
+            // double zScale = findColScale(&hm[0]);
+            printBW(&hm[0], cell, findColScale(&hm[0]), j+1);
         }
     }
     
     if (data==1) {
         // double zScale = findColScale(&hm[0]);
+        float x0 = xn+txn*dz*0.5*(nPlates-pn)/1000.0;
+        float y0 = yn+tyn*dz*0.5*(nPlates-pn)/1000.0;
+        setRanges2(&hm[0], x0, y0);
         printBW(&hm[0], cell, findColScale(&hm[0]), 0);
     }
 
