@@ -31,15 +31,15 @@ void printMemoryInfo() {
 // paths
 const char* lab = "Napoli";
 const int run = 1;
-const int brick = 121;
+const int brick = 21;
 
 // Parameters
-bool print = false;
+bool print = true;
 const int binSize    = 50;   // (um)
 const int shiftRange = 50;   // (mrad) //enlarge with bigger step
 const int shiftStep  = 2;    // (mrad)
 const int radius     = 200;  // (um)
-const int ntag = 200;
+const int ntag = 150;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 const int nPlates = 57;
 const int stepZ = 1350;
@@ -54,9 +54,9 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
     if (data == 0) { // Muon simulation
         // *path = "/Users/fabioali/cernbox/shift/muon";
         // *opath = *path;
-        *path = "/eos/experiment/sndlhc/users/dancc/FEDRA/muon_regenRUN1/cell_reco";
-        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_muon/%i", cell);
-        *ppath = "/eos/user/f/falicant/shift/muon_regen";
+        *path = TString::Format("/eos/experiment/sndlhc/users/dancc/FEDRA/muon_Euniform_RUN1_FLUKA25/b%06i/cell_reco", brick);
+        *opath = TString::Format("/eos/experiment/sndlhc/users/falicant/shift_muon_FLUKA/b%06i", brick);
+        *ppath = TString::Format("/eos/user/f/falicant/shift/muon_FLUKA/b%06i", brick);
         *xLow = cell % 18 + 1;
         *yLow = cell / 18 + 1;
         *range = 4000;
@@ -158,7 +158,7 @@ void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
                 H3cells[idx] = nullptr;
             }
             else {
-                TString histFile = TString::Format("%s/cell_%i0_%i0/b000021/b000021.0.0.0.trk.root", path.Data(), xCell, yCell);
+                TString histFile = TString::Format("%s/cell_%i0_%i0/b%06i/b%06i.0.%i.%i.trk.root", path.Data(), xCell, yCell, brick, brick, xCell, yCell);
                 // std::cout << histFile << std::endl;
                 f[idx] = TFile::Open(histFile);
                 H3cells[idx] = loadH3(f[idx]);
@@ -170,7 +170,6 @@ void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
     H2cell->Smooth();
     TH1F* hSpec2 = drawSpectrum(H2cell);
     poisBkg(hSpec2, &bkg);
-
 }
 
 TH2F* projectHist(TH3F* h3, int plate) {
@@ -458,7 +457,7 @@ int main(int argc, char* argv[]) {
     TH2F *hm[nPlates];
     TH2::AddDirectory(false);
     for(int combination = 0; combination < ((2*shiftRange/shiftStep+1)*(2*shiftRange/shiftStep+1)); combination++) {
-        if (combination!=1293&&combination!=1300) continue;
+        if (combination!=1300 && combination!=1293) continue;
         stopWatch.Continue();
         
         std::cout << "Combination " << combination << std::endl;

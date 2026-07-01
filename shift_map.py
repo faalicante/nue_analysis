@@ -23,8 +23,8 @@ def makeTMap(hTmap, peaks):
     peak_y_coords = peaks[1]
     peak_tx_coords = []
     peak_ty_coords = []
-    output = ROOT.TFile.Open(f'peak_map_{cell}.root', 'RECREATE')
-    outtree = ROOT.TNtuple("showers", "showers", "cell:combination:tag:tx:ty:x:y:p:peak")
+    output = ROOT.TFile.Open(f'maps/peak_map_{cell}.root', 'RECREATE')
+    outtree = ROOT.TNtuple("showers", "showers", "cell:combination:tag:tx:ty:x:y:p:peak:nseg:bkg:nfound")
     for px, py in zip(peak_x_coords, peak_y_coords):
         x = np.searchsorted(xedges, px)
         y = np.searchsorted(yedges, py)
@@ -33,7 +33,7 @@ def makeTMap(hTmap, peaks):
         ix = combination % nbins
         iy = combination // nbins
         if abs(px-xCenter)>5000 or abs(py-yCenter)>5000: continue
-        outtree.Fill(map[(x,y)][0], map[(x,y)][1], map[(x,y)][2], ix*2-50, iy*2-50, map[(x,y)][5], map[(x,y)][6], map[(x,y)][3], map[(x,y)][4])
+        outtree.Fill(map[(x,y)][0], map[(x,y)][1], map[(x,y)][2], ix*2-50, iy*2-50, map[(x,y)][5], map[(x,y)][6], map[(x,y)][3], map[(x,y)][4], map[(x,y)][7], map[(x,y)][8])
         tx_coord = txedges[ix]
         ty_coord = tyedges[iy]
         peak_tx_coords.append(int(tx_coord)+1)
@@ -47,7 +47,7 @@ def makeTMap(hTmap, peaks):
     plt.ylabel('TY')
     plt.legend()
     # plt.show()
-    plt.savefig(f'shift_Tmap_{cell}.png')
+    plt.savefig(f'maps/shift_Tmap_{cell}.png')
     plt.close()
     output.cd()
     outtree.Write()
@@ -70,7 +70,7 @@ def makeMap(hmap):
     plt.ylabel('Y')
     # plt.legend()
     # plt.show()
-    plt.savefig(f'shift_map_{cell}.png')
+    plt.savefig(f'maps/shift_map_{cell}.png')
     plt.close()
 
     return peak_x_coords, peak_y_coords
@@ -82,28 +82,28 @@ shiftStep  = 2   #mrad
 nbins      = int((shiftRange * 2)/shiftStep) + 1
 dz = 1350
 if data==1:
-    xRange = 6000
-    with open ('nue_int_100.txt', 'r') as f:
+    xRange = 5000
+    with open ('nue_int_10k.txt', 'r') as f:
         lines = f.readlines()
         line = lines[cell].strip().split(",")
         xCenter = float(line[3])
         yCenter = float(line[4])
 else:
-    xRange = 10000  #um
+    xRange = 5000  #um
     xcell = cell%18
     ycell = cell//18
     xCenter = (xcell+1)*10000
     yCenter = (ycell+1)*10000
 # xOffset = 288000      #um
 # yOffset = 83000      #um
-xStep  = 100     #um
+xStep  = 200     #um
 nxbins = int(2*xRange/xStep)
-nTag = 50
+nTag = 100
 
 # File
 # path = f'/eos/experiment/sndlhc/users/falicant/RUN1/b121/shift/{cell}/peaks.root'
 # path = f'/Users/fabioali/cernbox/test_shift/trk/{cell}/peaks.root'
-path = f'peaks_{cell}.root'
+path = f'peaks/peaks_{cell}.root'
 file = ROOT.TFile.Open(path)
 showers = file.Get("showers")
 
@@ -121,9 +121,10 @@ hTmap, txedges, tyedges = np.histogram2d(tx, ty, nbins, range=[[-shiftRange, shi
 for entry in showers:
     if entry.nfound > 1: continue
     combination = int(entry.combination)
+    # print(entry.rankbin, entry.bkg)
     peak = int(entry.rankbin)
     tag = int(entry.tag)
-    if tag > nTag : continue
+    # if tag > nTag : continue
     # if peak<500: continue
     ix = combination % nbins
     iy = combination // nbins
@@ -132,10 +133,16 @@ for entry in showers:
     plate = entry.maxplate
     projx = entry.x - tx/1000 * ((plate-1) * dz)
     projy = entry.y - ty/1000 * ((plate-1) * dz)
+    p = entry.start
+    pjx = entry.x - tx/1000 * ((p-1) * dz)
+    pjy = entry.y - ty/1000 * ((p-1) * dz)
     if abs(projx-xCenter)>xRange or abs(projy-yCenter)>xRange: continue
     x = int((projx - xCenter + xRange) // xStep)
     y = int((projy - yCenter + xRange) // xStep)
-    # if (combination==1293 and tag==1):
+    
+    # if (combination==1300 and (tag==1 or tag==19 or tag==93)):
+    #     print(tag, entry.x, entry.y, plate, projx, projy, p, pjx, pjy)
+    
     #     print(plate, tag, x, y, tx, ty, projx, entry.x, entry.y, peak, hmap[x,y], map[(x, y)])
     # if abs(x-2)<3 or abs(x-nxbins+2)<3 or abs(y-2)<3 or abs(y-nxbins+2)<3 : continue
     # if ROOT.TMath.Sqrt((ix-25)**2+(iy-25)**2)<7: continue
@@ -144,7 +151,9 @@ for entry in showers:
         hTmap[ix, iy] = peak
     if peak > hmap[x,y]:
         hmap[x,y] = peak
-        map[(x, y)] = (entry.cell, combination, tag, entry.start, peak, entry.x, entry.y)
+        map[(x, y)] = (entry.cell, combination, tag, entry.start, peak, entry.x, entry.y, entry.nseg, entry.bkg, entry.nfound)
+    # if (combination==1149 and tag==13) or (combination==1300 and tag==12):
+    #     print(combination, peak, hmap[x,y], map[(x, y)])
 # print(map[(67,59)])
 
 
