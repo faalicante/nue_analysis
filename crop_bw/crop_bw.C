@@ -34,8 +34,8 @@ const int brick = 21;
 // Parameters
 bool print = true;
 const int binSize    = 50;   // (um)
-const int radius     = 200;  // (um)
-const int ntag = 10;
+const int radius     = 500;  // (um)
+const int ntag = 300;
 const int nPlates = 57;
 const int dz = 1350;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
@@ -47,11 +47,11 @@ TString ppath;
 TString histName;
 
 void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, int* xLow, int* yLow, int* range) {
-    if (data == 0) { // Muon simulation
+    if (data == 0 || data == 3) { // Muon simulation //data==3 is for the "nothing" sample
         // *path = "/Users/fabioali/cernbox/shift/muon";
         // *opath = *path;
         *path = TString::Format("/eos/experiment/sndlhc/users/dancc/FEDRA/muon_Euniform_RUN1_FLUKA25/b%06i/cell_reco", brick);
-        *opath = "/eos/experiment/sndlhc/users/falicant/RNN/bkg";
+        *opath = "/eos/experiment/sndlhc/users/falicant/RNN2/none";
         *ppath = TString::Format("%s/%i", opath->Data(), cell);
         *xLow = cell % 18 + 1;
         *yLow = cell / 18 + 1;
@@ -62,7 +62,7 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         // *opath = *path;
         // *ppath = *opath;
         *path = "/eos/experiment/sndlhc/MonteCarlo/FEDRA/nuecc/nuecc_muon_Euniform_RUN1_FLUKA25/b000021";
-        *opath = "/eos/experiment/sndlhc/users/falicant/RNN/signal";
+        *opath = "/eos/experiment/sndlhc/users/falicant/RNN2/signal";
         *ppath = TString::Format("%s/%i", opath->Data(), cell);
         *range = 500;
     }
@@ -113,7 +113,7 @@ void setRanges2(TH2F **hm, float x0, float y0) {
         hm[i]->GetXaxis()->SetRangeUser(x0-range, x0+range);
         hm[i]->GetYaxis()->SetRangeUser(y0-range, y0+range);
     }
-    std::cout << "x range = [" << x0-range << ", " << x0+range << "], y range = [" << y0-range << ", " << y0+range << "]" << std::endl;
+    // std::cout << "x range = [" << x0-range << ", " << x0+range << "], y range = [" << y0-range << ", " << y0+range << "]" << std::endl;
 }
 
 TH3F* loadH3(TFile *f) {
@@ -140,7 +140,7 @@ TH1F* drawSpectrum(TH2F *h2) {
 
 void poisBkg(TH1F* h, float *bkg) {
     float mpv = h->GetBinLowEdge(h->GetMaximumBin());
-    *bkg = mpv+5*std::sqrt(mpv);
+    *bkg = mpv+3*std::sqrt(mpv);
     std::cout << "Poisson background: " << *bkg << std::endl;
 }
 
@@ -264,24 +264,24 @@ TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histNam
 
 int getMax(TH2F &h2, TObjArray &peaks, float bkg) {
     int rankbin = h2.GetMaximum();
-    if (rankbin > bkg) {
-        Int_t MaxBin = h2.GetMaximumBin();
-        Int_t ix,iy,iz;
-        h2.GetBinXYZ(MaxBin, ix, iy, iz);
-        float x = ((TAxis*)h2.GetXaxis())->GetBinCenter(ix);
-        float y = ((TAxis*)h2.GetYaxis())->GetBinCenter(iy);
-        TEllipse  *el = new TEllipse(x,y,radius,radius);
+    Int_t MaxBin = h2.GetMaximumBin();
+    Int_t ix,iy,iz;
+    h2.GetBinXYZ(MaxBin, ix, iy, iz);
+    float x = ((TAxis*)h2.GetXaxis())->GetBinCenter(ix);
+    float y = ((TAxis*)h2.GetYaxis())->GetBinCenter(iy);
+    TEllipse  *el = new TEllipse(x,y,radius,radius);
+    int r0 = (int)round((double)radius/binSize);
+    for(int iix = ix-r0; iix<=ix+r0; iix++) {
+        for(int iiy = iy-r0; iiy<=iy+r0; iiy++) {
+            double dx = iix - ix;
+            double dy = iiy - iy;
+            double distance = (dx*dx + dy*dy)/(r0*r0);
+            if (distance <= 1) h2.SetBinContent(iix,iiy,0);
+        }
+    }
+    if (rankbin < bkg) {
         el->SetFillStyle(0);
         peaks.Add(el);
-        int r0 = (int)round((double)radius/binSize);
-        for(int iix = ix-r0; iix<=ix+r0; iix++) {
-            for(int iiy = iy-r0; iiy<=iy+r0; iiy++) {
-                double dx = iix - ix;
-                double dy = iiy - iy;
-                double distance = (dx*dx + dy*dy)/(r0*r0);
-                if (distance <= 1) h2.SetBinContent(iix,iiy,0);
-            }
-        }
         return rankbin;
     }
     return 0;
@@ -304,7 +304,7 @@ double findColScale(TH2F **hm) {
         double layerMaxBin = hm[i]->GetMaximumBin();
         if (layerMax > maxValue) maxValue = layerMax;
     }
-    std::cout << "Max value across all plates: " << maxValue << std::endl;
+    // std::cout << "Max value across all plates: " << maxValue << std::endl;
     return maxValue;
 }
 
@@ -380,8 +380,8 @@ int main(int argc, char* argv[]) {
     gStyle->SetPadBottomMargin(0);
     gStyle->SetCanvasBorderMode(0);
     gStyle->SetPadBorderMode(0);
-    gStyle->SetCanvasColor(0);
-    gStyle->SetPadColor(0);
+    gStyle->SetCanvasColor(1);
+    gStyle->SetPadColor(1);
     gROOT->ForceStyle();
     
     getPath(data, &path, &opath, &ppath, cell, &xLow, &yLow, &range);
@@ -389,7 +389,7 @@ int main(int argc, char* argv[]) {
     TFile *f, *ff[9];
     TH3F *H3cell, *H3cells[9];
 
-    if (data == 0 || data == 1) {
+    if (data == 0 || data == 1 || data == 3) {
         openFiles(data, cell, &f, &H3cell);
     }
     // else {
@@ -403,7 +403,7 @@ int main(int argc, char* argv[]) {
     int combination=1300;
     stopWatch.Continue();
     
-    if (data == 0 || data == 1) hComb = stackHist(data, combination, cell, &hm[0], &histName, H3cell);
+    if (data == 0 || data == 1 || data == 3) hComb = stackHist(data, combination, cell, &hm[0], &histName, H3cell);
     else hComb = stackHist(data, combination, cell, &hm[0], &histName, &ff[0], &H3cells[0]);
     TH1F *hSpec2, *hSpec3;
     TObjArray peaks;
@@ -411,25 +411,56 @@ int main(int argc, char* argv[]) {
     get_peaks(*hComb,peaks,ntag,ranks,bkg);
     
     
-    if (data==0) {
+    if (data == 0) {
         int np = peaks.GetEntries();
-        for(int j=0; j<np; j++) {
-            TEllipse *el = ((TEllipse*)(peaks.At(j)));
+        for(int i=0; i<np; i++) {
+            int skip = false;
+            TEllipse *el = ((TEllipse*)(peaks.At(i)));
+            // if (el == nullptr) continue;
             float x0 = el->GetX1();
             float y0 = el->GetY1();
-            std::cout << "Peak " << j+1 << ": x = " << x0 << ", y = " << y0 << std::endl;
+            // for(int j=0; j<np; j++) {
+            //     if (j == i) continue;
+            //     // std::cout << "j " << j << " np " << np << std::endl;
+            //     TEllipse *el = ((TEllipse*)(peaks.At(j)));
+            //     // if (el == nullptr) continue;
+            //     // std::cout << "c" << std::endl;
+            //     float x1 = el->GetX1();
+            //     float y1 = el->GetY1();
+            //     float distance = std::sqrt((x1-x0)*(x1-x0)+(y1-y0)*(y1-y0));
+            //     if (distance < (range)) {
+            //         // std::cout << "Skipping peak " << i << " due to proximity to peak " << j << std::endl;
+            //         // peaks.RemoveAt(j);
+            //         // j--;
+            //         // np--;
+            //         skip = true;
+            //         break;
+            //     }
+            // }
+            // peaks.Compress();
+            if ((xLow+19)*10000 > x0-range || x0+range > (xLow+20)*10000 || (yLow+0.45)*10000-5000 > y0-range || (y0+range > (yLow+0.45)*10000+5000)) {
+                skip = true;
+            }
+            if (skip) continue;
             setRanges2(&hm[0], x0, y0);
-            // double zScale = findColScale(&hm[0]);
-            printBW(&hm[0], cell, findColScale(&hm[0]), j+1);
+            double zScale = findColScale(&hm[0]);
+            if (zScale < 1.5*(bkg/nPlates)) {
+                // std::cout << "Peak " << i+1 << ": x = " << x0 << ", y = " << y0 << std::endl;
+                std::cout << "zScale = " << zScale << std::endl;
+                // continue;
+                printBW(&hm[0], cell, zScale, i+1);
+            }   
         }
     }
     
-    if (data==1) {
+    else if (data == 1) {
         // double zScale = findColScale(&hm[0]);
         float x0 = xn+txn*dz*0.5*(nPlates-pn)/1000.0;
         float y0 = yn+tyn*dz*0.5*(nPlates-pn)/1000.0;
         setRanges2(&hm[0], x0, y0);
-        printBW(&hm[0], cell, findColScale(&hm[0]), 0);
+        double zScale = findColScale(&hm[0]);
+        std::cout << "Event " << cell << ": zScale = " << zScale << std::endl;
+        // printBW(&hm[0], cell, zScale, 0);
     }
 
     // if (!std::filesystem::exists(ppath.Data())) std::filesystem::create_directory(ppath.Data());
@@ -463,6 +494,6 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Time: " << round(stopWatch.RealTime()) << std::endl;
     printMemoryInfo();
-    
+
     return 0;
 }

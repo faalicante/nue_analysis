@@ -31,7 +31,7 @@ void printMemoryInfo() {
 // paths
 const char* lab = "Napoli";
 const int run = 1;
-const int brick = 21;
+const int brick = 24;
 
 // Parameters
 bool print = true;
@@ -39,7 +39,7 @@ const int binSize    = 50;   // (um)
 const int shiftRange = 50;   // (mrad) //enlarge with bigger step
 const int shiftStep  = 2;    // (mrad)
 const int radius     = 200;  // (um)
-const int ntag = 150;
+const int ntag = 200;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 const int nPlates = 57;
 const int stepZ = 1350;
