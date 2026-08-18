@@ -1,4 +1,5 @@
 #include "TFile.h"
+#include "TTree.h"
 #include "TH2F.h"
 #include "TH3F.h"
 #include "TROOT.h"
@@ -14,10 +15,12 @@
 #include "TLegend.h"
 #include <iostream>
 #include <filesystem>
+#include <algorithm>
 #include <map>
 #include <vector>
-#include <stdexcept>
 #include <cmath>
+#include <limits>
+#include <string>
 
 void printMemoryInfo() {
     ProcInfo_t procInfo;
@@ -29,22 +32,109 @@ void printMemoryInfo() {
 // paths
 const char* lab = "Napoli";
 const int run = 1;
-const int brick = 21;
+const int brick = 121;
 
 // Parameters
-bool print = true;
+bool print = false;
 const int binSize    = 50;   // (um)
 const int radius     = 500;  // (um)
-const int ntag = 300;
+const int ntag = 250;
 const int nPlates = 57;
+const int cropSize = 20;
+const int hardZScaleSize = 10;
+const int cropVoxels = nPlates * cropSize * cropSize;
 const int dz = 1350;
+const Int_t poissonSample = 0;
+const Int_t hardNegativeSample = 1;
+const Int_t signalSample = 2;
 int xMin, xMax, yMin, yMax, xBins, yBins, xLow, yLow;
 int range;
-float bkg = 0;
+float bkg = 0.0F;
+double threshold = 0.0;
 TString path;
 TString opath;
 TString ppath;
 TString histName;
+
+class SampleTreeWriter {
+public:
+    explicit SampleTreeWriter(const TString& outputPath) {
+        outputFile_ = TFile::Open(outputPath, "RECREATE");
+        tree_ = new TTree("samples", "Raw source regions");
+        tree_->SetDirectory(outputFile_);
+        const TString countsLeaf = TString::Format(
+            "counts[%d][%d][%d]/I", nPlates, cropSize, cropSize);
+        tree_->Branch("counts", counts_, countsLeaf.Data());
+        tree_->Branch("background_mu", &backgroundMu_, "background_mu/F");
+        tree_->Branch("presence", &presence_, "presence/I");
+        tree_->Branch("sample_type", &sampleType_, "sample_type/I");
+        tree_->Branch("slope_x", &slopeX_, "slope_x/F");
+        tree_->Branch("slope_y", &slopeY_, "slope_y/F");
+        tree_->Branch("signal_event_id", &signalEventId_, "signal_event_id/I");
+        tree_->Branch("cell_id", &cellId_, "cell_id/I");
+        tree_->Branch("tag_cell_id", &tagCellId_, "tag_cell_id/I");
+    }
+
+    void fill(TH2** rawLayers, float x0, float y0, int presence, int sampleType,
+              float slopeX, float slopeY, int signalEventId,
+              int cellId, int tagCellId, float bkg) {
+        std::fill_n(counts_, cropVoxels, 0);
+        presence_ = presence;
+        sampleType_ = sampleType;
+        slopeX_ = slopeX;
+        slopeY_ = slopeY;
+        signalEventId_ = signalEventId;
+        cellId_ = cellId;
+        tagCellId_ = tagCellId;
+        backgroundMu_ = bkg/nPlates;
+
+        for (int z = 0; z < nPlates; ++z) {
+            TH2* layer = rawLayers[z];
+
+            const int centerX = layer->GetXaxis()->FindFixBin(x0);
+            const int centerY = layer->GetYaxis()->FindFixBin(y0);
+            const int firstX = centerX - cropSize / 2;
+            const int firstY = centerY - cropSize / 2;
+
+            for (int y = 0; y < cropSize; ++y) {
+                const int sourceY = firstY + y;
+                for (int x = 0; x < cropSize; ++x) {
+                    const int sourceX = firstX + x;
+                    int value = 0;
+                    if (sourceX > 0 && sourceX <= layer->GetNbinsX() &&
+                        sourceY > 0 && sourceY <= layer->GetNbinsY()) {
+                        value = layer->GetBinContent(sourceX, sourceY);
+                    }
+                    const int index = (z * cropSize * cropSize) + (y * cropSize) + x;
+                    counts_[index] = value;
+                }
+            }
+        }
+        tree_->Fill();
+    }
+
+    void write() {
+        outputFile_->cd();
+        tree_->Write();
+        outputFile_->Close();
+        delete outputFile_;
+        outputFile_ = nullptr;
+        tree_ = nullptr;
+    }
+
+private:
+    TFile* outputFile_ = nullptr;
+    TTree* tree_ = nullptr;
+    Int_t counts_[cropVoxels] = {};
+    Float_t backgroundMu_ = 0.0F;
+    Int_t presence_ = 0;
+    Int_t sampleType_ = poissonSample;
+    Float_t slopeX_ = 0.0F;
+    Float_t slopeY_ = 0.0F;
+    Int_t signalEventId_ = -1;
+    Int_t cellId_ = -1;
+    Int_t tagCellId_ = -1;
+};
 
 void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, int* xLow, int* yLow, int* range) {
     if (data == 0 || data == 3) { // Muon simulation //data==3 is for the "nothing" sample
@@ -75,27 +165,16 @@ void getPath(int data, TString* path, TString* opath, TString *ppath, int cell, 
         *ppath = TString::Format("/eos/user/f/falicant/RUN%i/brick%i/shifts", run, brick);
         *xLow = cell % 18 + 1;
         *yLow = cell / 18 + 1;
-        *range = 4000;
+        *range = 500;
     }
 }
 
 TH2F* setRanges1(int data, int cell, TFile** f, int* xMin, int* xMax, int* yMin, int* yMax, int* xBins, int* yBins) {
     TH2F* h2 = (TH2F*)((*f)->Get("XYseg"));
-    int fax, fay, lax, lay;
-    // if (data==1) {
-    //     int nbinsX = h2->GetNbinsX();
-    //     int nbinsY = h2->GetNbinsY();
-    //     fax = nbinsX / 2;
-    //     fay = nbinsY / 2;
-    //     lax = fax;
-    //     lay = fay;
-    // }
-    // else {
-        fax = h2->FindFirstBinAbove(0,1);
-        fay = h2->FindFirstBinAbove(0,2);
-        lax = h2->FindLastBinAbove(0,1);
-        lay = h2->FindLastBinAbove(0,2);
-    // }
+    int fax = h2->FindFirstBinAbove(0,1);
+    int fay = h2->FindFirstBinAbove(0,2);
+    int lax = h2->FindLastBinAbove(0,1);
+    int lay = h2->FindLastBinAbove(0,2);
 
     *xMin = (int)(h2->GetXaxis()->GetBinLowEdge(fax)) - range;
     *xMax = (int)(h2->GetXaxis()->GetBinUpEdge(lax)) + range;
@@ -108,7 +187,7 @@ TH2F* setRanges1(int data, int cell, TFile** f, int* xMin, int* xMax, int* yMin,
     return h2;
 }
 
-void setRanges2(TH2F **hm, float x0, float y0) {
+void setRanges2(TH2 **hm, float x0, float y0) {
     for (int i = 0; i < nPlates; ++i) {
         hm[i]->GetXaxis()->SetRangeUser(x0-range, x0+range);
         hm[i]->GetYaxis()->SetRangeUser(y0-range, y0+range);
@@ -120,15 +199,15 @@ TH3F* loadH3(TFile *f) {
     TH3F *h3 = nullptr;
     if (f) {
         f->GetObject("XYPseg", h3);
-        h3->SetDirectory(0);
+        if (h3) h3->SetDirectory(0);
     }
     return h3;
 }
 
-TH1F* drawSpectrum(TH2F *h2) {
+TH1F* drawSpectrum(TH2F *h2, const char* name) {
     int nBinsX = h2->GetNbinsX();
     int nBinsY = h2->GetNbinsY();
-    TH1F* hSpec = new TH1F("hSpec", "Spectrum;rankbin", 200, 0, 1000);
+    TH1F* hSpec = new TH1F(name, "Spectrum;rankbin", 200, 0, 1000);
     for (int i = 1; i <= nBinsX; ++i) {
         for (int j = 1; j <= nBinsY; ++j) {
             int content = h2->GetBinContent(i, j);
@@ -138,132 +217,64 @@ TH1F* drawSpectrum(TH2F *h2) {
     return hSpec;
 }
 
-void poisBkg(TH1F* h, float *bkg) {
-    float mpv = h->GetBinLowEdge(h->GetMaximumBin());
-    *bkg = mpv+3*std::sqrt(mpv);
-    std::cout << "Poisson background: " << *bkg << std::endl;
+void poisBkg(TH1F* rawSpectrum, TH1F* smoothedSpectrum,
+             float *bkg, double *threshold) {
+    const double rawMpv = rawSpectrum->GetBinLowEdge(rawSpectrum->GetMaximumBin());
+    const double smoothedMpv =
+        smoothedSpectrum->GetBinLowEdge(smoothedSpectrum->GetMaximumBin());
+    *bkg = static_cast<float>(rawMpv);
+    *threshold = smoothedMpv + 3*std::sqrt(smoothedMpv);
+    std::cout << "Poisson background (raw MPV): " << *bkg << std::endl;
+    std::cout << "Poisson threshold (smoothed): " << *threshold << std::endl;
 }
 
-void openFiles(int data, int cell, TFile** f, TH3F** H3cell) {
+void openFiles(int data, int cell, const TString& inputPath, TFile** f, TH3F** H3cell) {
     TString fileName;
-    if (data==1) fileName = TString::Format("%s/b000021.0.0.%i.trk.root", path.Data(), cell+1);
-    if (data==0) fileName = TString::Format("%s/cell_%i0_%i0/b%06i/b%06i.0.%i.%i.trk.root", path.Data(), xLow, yLow, brick, brick, xLow, yLow);
+    if (!inputPath.IsNull()) fileName = inputPath;
+    else if (data==1) fileName = TString::Format("%s/b%06i.0.0.%i.trk.root", path.Data(), brick, cell+1);
+    else if (data==0 || data==3) fileName = TString::Format("%s/cell_%i0_%i0/b%06i/b%06i.0.%i.%i.trk.root", path.Data(), xLow, yLow, brick, brick, xLow, yLow);
     // std::cout << fileName << std::endl;
     *f = TFile::Open(fileName);
     TH2F* H2cell = setRanges1(data, cell, f, &xMin, &xMax, &yMin, &yMax, &xBins, &yBins);
     *H3cell = loadH3(*f);
-    H2cell->Smooth();
-    TH1F* hSpec2 = drawSpectrum(H2cell);
-    poisBkg(hSpec2, &bkg);
+    TH1F* rawSpectrum = drawSpectrum(H2cell, "raw_background_spectrum");
+    TH2F* smoothedH2cell = (TH2F*)H2cell->Clone("XYseg_background_smoothed");
+    smoothedH2cell->SetDirectory(nullptr);
+    smoothedH2cell->Smooth();
+    TH1F* smoothedSpectrum =
+        drawSpectrum(smoothedH2cell, "smoothed_background_spectrum");
+    poisBkg(rawSpectrum, smoothedSpectrum, &bkg, &threshold);
+    delete rawSpectrum;
+    delete smoothedSpectrum;
+    delete smoothedH2cell;
 }
 
-// void openFiles(int data, int cell, TFile* f[9], TH3F* H3cells[9]) {
-//     int idx = 0;
-//     for (int yCell = yLow-1; yCell <= yLow+1; yCell ++) {
-//         for (int xCell = xLow-1; xCell <= xLow+1; xCell++) {
-//             if (xCell < 1 || xCell > 18 || yCell < 1 || yCell > 18) {
-//                 f[idx] = nullptr;
-//                 H3cells[idx] = nullptr;
-//             }
-//             else {
-//                 TString histFile = TString::Format("%s/cell_%i0_%i0/b%06i/b%06i.0.%i.%i.trk.root", path.Data(), xCell, yCell, brick, brick, xCell, yCell);
-//                 // std::cout << histFile << std::endl;
-//                 f[idx] = TFile::Open(histFile);
-//                 H3cells[idx] = loadH3(f[idx]);
-//             }
-//             idx++;   
-//         }
-//     }
-//     TH2F* H2cell = setRanges1(data, cell, &f[4], &xMin, &xMax, &yMin, &yMax, &xBins, &yBins);
-//     H2cell->Smooth();
-//     TH1F* hSpec2 = drawSpectrum(H2cell);
-//     poisBkg(hSpec2, &bkg);
-// }
-
-TH2F* projectHist(TH3F* h3, int plate) {
-    h3->GetEntries();
+TH2* projectHist(TH3F* h3, int plate) {
     h3->GetZaxis()->SetRange(plate+1,plate+1);
-    TH2F* h2 = (TH2F*)(h3->Project3D("yx"));
+    TH2* h2 = (TH2*)(h3->Project3D("yx"));
     return h2;
 }
 
-TH2F* matrixCells(TH3F* h3, int plate, double shiftX, double shiftY) {
-    TH2F* hm = new TH2F(histName, histName, xBins, xMin, xMax, yBins, yMin, yMax);
-    TH2F* h2 = projectHist(h3, plate);
-    for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
-        double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
-        if (xCenter > xMax || xCenter < xMin) continue;
-        for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
-            double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-            if (yCenter > yMax || yCenter < yMin) continue;
-            double content = h2->GetBinContent(xBin, yBin);
-            int xBinNew = hm->GetXaxis()->FindBin(xCenter);
-            int yBinNew = hm->GetYaxis()->FindBin(yCenter);
-            hm->SetBinContent(xBinNew, yBinNew, content);
-        }
-    }
-    delete h2;
-    return hm;
-}
-
-TH2F* matrixCells(TFile* f[9],  TH3F* H3cells[9], int plate, double shiftX, double shiftY) {
-    TH2F* hm = new TH2F(histName, histName, xBins, xMin, xMax, yBins, yMin, yMax);
-    TH2F* h2;
-    for (int i = 0; i < 9; i++) {
-        if (f[i] == nullptr) continue;
-        h2 = projectHist(H3cells[i], plate);
-        for (int xBin = 1; xBin <= h2->GetNbinsX(); ++xBin) {
-            double xCenter = h2->GetXaxis()->GetBinCenter(xBin) + shiftX;
-            if (xCenter > xMax || xCenter < xMin) continue;
-            for (int yBin = 1; yBin <= h2->GetNbinsY(); ++yBin) {
-                double yCenter = h2->GetYaxis()->GetBinCenter(yBin) + shiftY;
-                if (yCenter > yMax || yCenter < yMin) continue;
-                double content = h2->GetBinContent(xBin, yBin);
-                if (content <= 0) continue;
-                int xBinNew = hm->GetXaxis()->FindBin(xCenter);
-                int yBinNew = hm->GetYaxis()->FindBin(yCenter);
-                if (content > hm->GetBinContent(xBinNew, yBinNew)) hm->SetBinContent(xBinNew, yBinNew, content);
-            }
-        }
-        delete h2;
-    }
-    return hm;
-}
-
-TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName, TH3F *H3cell) {
-    TH2F* hComb = new TH2F("XYseg", "XYseg", xBins, xMin, xMax, yBins, yMin, yMax);
+TH2* stackHist(TH2 **rawLayers, TH2 **smoothedLayers, TH3F *H3cell) {
+    TH2* hComb = nullptr;
     for (int layer = 0; layer < nPlates; ++layer) {
-        
         int plate = layer + 1;
-        // std::cout << "Shifting plate " << plate << std::endl;
-        
-        *histName = TString::Format("XYseg_%d", plate);
-        hm[layer] = matrixCells(H3cell, plate, 0, 0);
-        hComb->Add(hm[layer]);
-        hm[layer]->Smooth();
+        rawLayers[layer] = projectHist(H3cell, plate);
+        if (hComb == nullptr) {
+            hComb = (TH2*)rawLayers[layer]->Clone("XYseg_candidates");
+            hComb->Reset();
+        }
+        hComb->Add(rawLayers[layer]);
+        smoothedLayers[layer] = (TH2*)rawLayers[layer]->Clone(
+            TString::Format("XYseg_smoothed_%d", plate));
+        smoothedLayers[layer]->Smooth();
     }
     hComb->Smooth();
     return hComb;
 }
 
-TH2F* stackHist(int data, int combination, int cell, TH2F **hm, TString *histName, TFile* ff[9], TH3F* H3cells[9]) {
-    TH2F* hComb = new TH2F("XYseg", "XYseg", xBins, xMin, xMax, yBins, yMin, yMax);
-    for (int layer = 0; layer < nPlates; ++layer) {
-        
-        int plate = layer + 1;
-        // std::cout << "Shifting plate " << plate << std::endl;
-        
-        *histName = TString::Format("XYseg_%d", plate);
-        hm[layer] = matrixCells(&ff[0], &H3cells[0], plate, 0, 0);
-        hComb->Add(hm[layer]);
-        hm[layer]->Smooth();
-    }
-    hComb->Smooth();
-    return hComb;
-}
-
-int getMax(TH2F &h2, TObjArray &peaks, float bkg) {
-    int rankbin = h2.GetMaximum();
+void getMax(int data, TH2 &h2, TObjArray &peaks, double threshold) {
+    const double rankbin = h2.GetMaximum();
     Int_t MaxBin = h2.GetMaximumBin();
     Int_t ix,iy,iz;
     h2.GetBinXYZ(MaxBin, ix, iy, iz);
@@ -279,36 +290,43 @@ int getMax(TH2F &h2, TObjArray &peaks, float bkg) {
             if (distance <= 1) h2.SetBinContent(iix,iiy,0);
         }
     }
-    if (rankbin < bkg) {
+    if ( (data == 0 && rankbin > threshold) || (data == 3 && rankbin < threshold) ) {
         el->SetFillStyle(0);
         peaks.Add(el);
-        return rankbin;
     }
-    return 0;
+    else {
+        delete el;
+    }
 }
 
-void get_peaks(TH2F &h2, TObjArray &peaks, int npmax, int *ranks, float bkg) {
-    TH2F *h2new = (TH2F*)h2.Clone("get_peaks");
+void get_peaks(int data,TH2 &h2, TObjArray &peaks, int npmax, double threshold) {
+    TH2 *h2new = (TH2*)h2.Clone("get_peaks");
     for(int i=0; i<npmax; i++){
-        int rankbin = getMax(*h2new, peaks, bkg);
-        ranks[i] = rankbin;
+        getMax(data,*h2new, peaks, threshold);
     }
+    delete h2new;
 }
 
-double findColScale(TH2F **hm) {
+double findColScale(TH2 **hm, float x0, float y0, int windowSize) {
     double maxValue = 0;
     for (int i = 0; i < nPlates; ++i) {
         if (hm[i] == nullptr) continue;
-        hm[i]->SetMaximum(-1111);
-        double layerMax = hm[i]->GetMaximum();
-        double layerMaxBin = hm[i]->GetMaximumBin();
-        if (layerMax > maxValue) maxValue = layerMax;
+        const int centerX = hm[i]->GetXaxis()->FindFixBin(x0);
+        const int centerY = hm[i]->GetYaxis()->FindFixBin(y0);
+        const int firstX = centerX - windowSize / 2;
+        const int firstY = centerY - windowSize / 2;
+        for (int y = 0; y < windowSize; ++y) {
+            for (int x = 0; x < windowSize; ++x) {
+                const double value = hm[i]->GetBinContent(firstX + x, firstY + y);
+                if (value > maxValue) maxValue = value;
+            }
+        }
     }
     // std::cout << "Max value across all plates: " << maxValue << std::endl;
     return maxValue;
 }
 
-void printBW (TH2F **hm, int cell, double zScale, int tag) {
+void printBW (TH2 **hm, int cell, double zScale, int tag) {
     if (!std::filesystem::exists(ppath.Data())) std::filesystem::create_directory(ppath.Data());
     if (!std::filesystem::exists(TString::Format("%s/%i", ppath.Data(), tag).Data())&&tag>0) {
         std::filesystem::create_directory(TString::Format("%s/%i", ppath.Data(), tag).Data());
@@ -327,44 +345,7 @@ void printBW (TH2F **hm, int cell, double zScale, int tag) {
     delete c;
 }
 
-int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <data>" << argv[1] << " <cell>" << argv[2] << std::endl;
-        // data = {0: muon, 1: nue, 2: data}
-        // cell for nue is event
-    }
-    int data = std::atoi(argv[1]);
-    int cell = std::atoi(argv[2]);
-    
-    // for neutrino only
-    double xn, yn, txn, tyn;
-    int pn;
-    for (int i = 3; i < argc; ++i) {
-        std::string arg = argv[i];
-
-        if (arg == "--x0" && i + 1 < argc) {
-            xn = std::stod(argv[++i]);
-        }
-        else if (arg == "--y0" && i + 1 < argc) {
-            yn = std::stod(argv[++i]);
-        }
-        else if (arg == "--tx" && i + 1 < argc) {
-            txn = std::stod(argv[++i]);
-        }
-        else if (arg == "--ty" && i + 1 < argc) {
-            tyn = std::stod(argv[++i]);
-        }
-        else if (arg == "--p0" && i + 1 < argc) {
-            pn = std::atoi(argv[++i]);
-        }
-        else {
-            std::cerr << "Unknown argument: " << arg << std::endl;
-        }
-    }
-    
-    TStopwatch stopWatch;
-    stopWatch.Start();
-
+void setStyle() {
     gErrorIgnoreLevel = kWarning;
     gROOT->SetBatch(!print);
     gStyle->SetOptStat(0);
@@ -383,114 +364,144 @@ int main(int argc, char* argv[]) {
     gStyle->SetCanvasColor(1);
     gStyle->SetPadColor(1);
     gROOT->ForceStyle();
+}
+
+int main(int argc, char* argv[]) {
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0]
+                  << " <data> <cell> [--input file.root] [--output samples.root]"
+                  << " [--x0 X --y0 Y --tx TX --ty TY --p0 PLATE] [--images]" << std::endl;
+        // data = {0: muon, 1: nue, 2: data}
+        // cell for nue is event
+        return 1;
+    }
+    int data = std::atoi(argv[1]);
+    int cell = std::atoi(argv[2]);
+    
+    // for neutrino only
+    double xn = std::numeric_limits<double>::quiet_NaN();
+    double yn = std::numeric_limits<double>::quiet_NaN();
+    double txn = std::numeric_limits<double>::quiet_NaN();
+    double tyn = std::numeric_limits<double>::quiet_NaN();
+    int pn = -1;
+    TString inputPath;
+    TString outputPath = "samples.root";
+    for (int i = 3; i < argc; ++i) {
+        std::string arg = argv[i];
+
+        if (arg == "--x0" && i + 1 < argc) {
+            xn = std::stod(argv[++i]);
+        }
+        else if (arg == "--y0" && i + 1 < argc) {
+            yn = std::stod(argv[++i]);
+        }
+        else if (arg == "--tx" && i + 1 < argc) {
+            txn = std::stod(argv[++i]);
+        }
+        else if (arg == "--ty" && i + 1 < argc) {
+            tyn = std::stod(argv[++i]);
+        }
+        else if (arg == "--p0" && i + 1 < argc) {
+            pn = std::atoi(argv[++i]);
+        }
+        else if (arg == "--input" && i + 1 < argc) {
+            inputPath = argv[++i];
+        }
+        else if (arg == "--output" && i + 1 < argc) {
+            outputPath = argv[++i];
+        }
+        else if (arg == "--images") {
+            print = true;
+        }
+        else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+            return 1;
+        }
+    }
+    if (data == 1 && (!std::isfinite(xn) || !std::isfinite(yn) ||
+                      !std::isfinite(txn) || !std::isfinite(tyn) || pn < 0)) {
+        std::cerr << "data=1 requires --x0, --y0, --tx, --ty and --p0" << std::endl;
+        return 1;
+    }
+    
+    TStopwatch stopWatch;
+    stopWatch.Start();
+
+    setStyle();
     
     getPath(data, &path, &opath, &ppath, cell, &xLow, &yLow, &range);
     
-    TFile *f, *ff[9];
-    TH3F *H3cell, *H3cells[9];
+    TFile *f = nullptr;
+    TH3F *H3cell = nullptr;
 
-    if (data == 0 || data == 1 || data == 3) {
-        openFiles(data, cell, &f, &H3cell);
-    }
-    // else {
-    //     openFiles(data, cell, &ff[0], &H3cells[0]);
-    // }
+    openFiles(data, cell, inputPath, &f, &H3cell);
 
-    TH2F* hComb;
-    TH2F* hProc;
-    TH2F *hm[nPlates];
+    TH2 *rawLayers[nPlates] = {};
+    TH2 *smoothedLayers[nPlates] = {};
     TH2::AddDirectory(false);
-    int combination=1300;
-    stopWatch.Continue();
-    
-    if (data == 0 || data == 1 || data == 3) hComb = stackHist(data, combination, cell, &hm[0], &histName, H3cell);
-    else hComb = stackHist(data, combination, cell, &hm[0], &histName, &ff[0], &H3cells[0]);
-    TH1F *hSpec2, *hSpec3;
+    TH2 *hComb = stackHist(&rawLayers[0], &smoothedLayers[0], H3cell);
     TObjArray peaks;
-    int ranks[ntag];
-    get_peaks(*hComb,peaks,ntag,ranks,bkg);
+    peaks.SetOwner(kTRUE);
+    get_peaks(data,*hComb,peaks,ntag,threshold);
+    SampleTreeWriter sampleWriter(outputPath);
+    int outputSamples = 0;
     
-    
-    if (data == 0) {
+    if (data == 0 || data == 3) {
         int np = peaks.GetEntries();
         for(int i=0; i<np; i++) {
-            int skip = false;
             TEllipse *el = ((TEllipse*)(peaks.At(i)));
-            // if (el == nullptr) continue;
             float x0 = el->GetX1();
             float y0 = el->GetY1();
-            // for(int j=0; j<np; j++) {
-            //     if (j == i) continue;
-            //     // std::cout << "j " << j << " np " << np << std::endl;
-            //     TEllipse *el = ((TEllipse*)(peaks.At(j)));
-            //     // if (el == nullptr) continue;
-            //     // std::cout << "c" << std::endl;
-            //     float x1 = el->GetX1();
-            //     float y1 = el->GetY1();
-            //     float distance = std::sqrt((x1-x0)*(x1-x0)+(y1-y0)*(y1-y0));
-            //     if (distance < (range)) {
-            //         // std::cout << "Skipping peak " << i << " due to proximity to peak " << j << std::endl;
-            //         // peaks.RemoveAt(j);
-            //         // j--;
-            //         // np--;
-            //         skip = true;
-            //         break;
-            //     }
-            // }
-            // peaks.Compress();
-            if ((xLow+19)*10000 > x0-range || x0+range > (xLow+20)*10000 || (yLow+0.45)*10000-5000 > y0-range || (y0+range > (yLow+0.45)*10000+5000)) {
-                skip = true;
+            if ((xLow+19)*10000 > x0-range || x0+range > (xLow+20)*10000 ||
+                (yLow-1+0.45)*10000 > y0-range || (y0+range > (yLow+0.45)*10000))
+                continue;
+            setRanges2(&smoothedLayers[0], x0, y0);
+            const int zScaleWindow = data == 3 ? cropSize : hardZScaleSize;
+            double zScale = findColScale(&smoothedLayers[0], x0, y0, zScaleWindow);
+
+            if (data == 0 && zScale > 3*(threshold/nPlates)) {
+                // std::cout << "zScale = " << zScale << std::endl;
+                    sampleWriter.fill(&rawLayers[0], x0, y0, 1, hardNegativeSample,
+                                      0.0, 0.0, -1, cell, i+1, bkg);
+                    ++outputSamples;
             }
-            if (skip) continue;
-            setRanges2(&hm[0], x0, y0);
-            double zScale = findColScale(&hm[0]);
-            if (zScale < 1.5*(bkg/nPlates)) {
-                // std::cout << "Peak " << i+1 << ": x = " << x0 << ", y = " << y0 << std::endl;
-                std::cout << "zScale = " << zScale << std::endl;
-                // continue;
-                printBW(&hm[0], cell, zScale, i+1);
-            }   
+            else if (data == 3 && zScale < 2*(threshold/nPlates)) {
+                    sampleWriter.fill(&rawLayers[0], x0, y0, 0, poissonSample,
+                                      0.0, 0.0, -1, cell, i+1, bkg);
+                    ++outputSamples;
+            }
+            if (print) printBW(&smoothedLayers[0], cell, zScale, i+1);
         }
     }
     
     else if (data == 1) {
-        // double zScale = findColScale(&hm[0]);
         float x0 = xn+txn*dz*0.5*(nPlates-pn)/1000.0;
         float y0 = yn+tyn*dz*0.5*(nPlates-pn)/1000.0;
-        setRanges2(&hm[0], x0, y0);
-        double zScale = findColScale(&hm[0]);
-        std::cout << "Event " << cell << ": zScale = " << zScale << std::endl;
-        // printBW(&hm[0], cell, zScale, 0);
+        sampleWriter.fill(&rawLayers[0], x0, y0, 1, signalSample,
+                          txn, tyn, cell, -1, -1, bkg);
+        ++outputSamples;
+        if (print) {
+            setRanges2(&smoothedLayers[0], x0, y0);
+            double zScale = findColScale(&smoothedLayers[0], x0, y0, cropSize);
+            // std::cout << "Event " << cell << ": zScale = " << zScale << std::endl;
+            printBW(&smoothedLayers[0], cell, zScale, 0);
+        }
     }
 
+    sampleWriter.write();
+    std::cout << "Output entries: " << outputSamples << " in " << outputPath << std::endl;
+
     // if (!std::filesystem::exists(ppath.Data())) std::filesystem::create_directory(ppath.Data());
-    
-    // TCanvas *c = new TCanvas("c", "c", 800, 800);
-    // for(int p=1; p<=nPlates; p++) { 
-    //     hm[p-1]->Draw("col0");
-    //     hm[p-1]->GetZaxis()->SetRangeUser(bkg/nPlates,zScale);
-    //     c->Update();
-    //     c->Print(Form("%s/%i_%i.png", ppath.Data(), cell, p));
-    //     c->Clear();
-    // }
 
     delete hComb;
-    
-    for(int p=1; p<=nPlates; p++) { 
-        delete hm[p-1];
+    for(int p=1; p<=nPlates; p++) {
+        delete rawLayers[p-1];
+        delete smoothedLayers[p-1];
     }
     std::cout << "---------------------" << std::endl;
     
-    if (data == 1 || data == 0) {
-        f->Close();
-        delete H3cell;
-    }
-    else {
-        for (int i = 0; i < 9; i++) {
-            if (ff[i] != nullptr) ff[i]->Close();
-            delete H3cells[i];
-        }
-    }
+    f->Close();
+    delete H3cell;
 
     std::cout << "Time: " << round(stopWatch.RealTime()) << std::endl;
     printMemoryInfo();
