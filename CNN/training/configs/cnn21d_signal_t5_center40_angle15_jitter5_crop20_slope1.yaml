@@ -1,0 +1,69 @@
+seed: 20260824
+deterministic: true
+device: auto
+output_dir: runs/cnn21d_signal_t5_center40/angle15_jitter5_crop20_slope1
+
+task:
+  include_sample_types: [1, 2]
+  positive_sample_types: [2]
+  signal_theta_range_mrad: null
+  presence_positive_theta_min_mrad: 15.0
+
+data:
+  hdf5_path: cnn_dataset_signal_t5_center40.h5
+  dataset:
+    crop_size: 20
+    max_jitter: 5
+    positive_max_jitter: 5
+    random_rotations: true
+    reflect_x: true
+    reflect_y: true
+    normalization_epsilon: 1.0e-6
+    min_positive_visible_fraction: 0.70
+
+model:
+  in_channels: 1
+  channels: [16, 32, 64, 128]
+  group_norm_groups: [4, 8, 8, 16]
+  pool_kernels:
+    - [1, 2, 2]
+    - [1, 2, 2]
+    - [2, 1, 1]
+    - [2, 1, 1]
+  head_hidden: 64
+  dropout: 0.0
+
+loss:
+  presence_weight: 1.0
+  slope_weight: 1.0
+  smooth_l1_beta: 1.0
+  positive_class_weight: null
+
+training:
+  batch_size: 16
+  num_workers: 0
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  early_stopping_patience: 4
+  early_stopping_min_delta: 0.0001
+
+evaluation:
+  threshold: 0.5
+
+subsets:
+  tiny:
+    train: 32
+    validation: 32
+    test: 32
+    epochs: 50
+    learning_rate: 0.003
+  pilot:
+    train: 1000
+    validation: 300
+    test: 300
+    epochs: 12
+  full:
+    train: null
+    validation: null
+    test: null
+    epochs: 100

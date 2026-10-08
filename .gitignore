@@ -1,3 +1,6 @@
+.gitignore
+.vscode
+.DS_Store
 *.png
 *.pdf
 *.root
@@ -7,3 +10,13 @@ condor/output
 falicant.cc
 */*.o
 */*.exe
+CNN/output*
+CNN/candidate_cut_diagnostics
+CNN/converter_retest_samples
+CNN/runs
+CNN/*json
+CNN/*csv
+CNN/*h5
+CNN/*log
+CNN/*txt
+CNN/pytest.ini

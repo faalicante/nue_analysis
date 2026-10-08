@@ -1,0 +1,2 @@
+# cell_id x y reason
+168 7 10  # problematic_data_cell: cell_70_100
