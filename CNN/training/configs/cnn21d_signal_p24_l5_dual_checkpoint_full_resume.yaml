@@ -1,0 +1,68 @@
+seed: 20260901
+deterministic: true
+device: auto
+output_dir: runs/cnn21d_signal_p24_l5/dual_checkpoint_balanced_resume
+
+task:
+  include_sample_types: [0, 1, 2]
+  positive_sample_types: [2]
+  signal_theta_range_mrad: null
+  presence_positive_theta_min_mrad: 10.0
+  presence_low_angle_policy: negative
+
+data:
+  hdf5_path: cnn_dataset_signal_p24_l5_poisson.h5
+  dataset:
+    crop_size: 20
+    max_jitter: 5
+    positive_max_jitter: 5
+    random_rotations: true
+    reflect_x: true
+    reflect_y: true
+    normalization_epsilon: 1.0e-6
+    min_positive_visible_fraction: 0.70
+    # 15% of train crops simulate reconstruction holes along z.
+    layer_drop_one_probability: 0.12
+    layer_drop_two_consecutive_probability: 0.03
+
+model:
+  in_channels: 1
+  channels: [16, 32, 64, 128]
+  group_norm_groups: [4, 8, 8, 16]
+  pool_kernels: [[1,2,2], [1,2,2], [2,1,1], [2,1,1]]
+  head_hidden: 64
+  dropout: 0.0
+
+loss:
+  presence_weight: 1.0
+  slope_weight: 2.0
+  smooth_l1_beta: 1.0
+  positive_class_weight: null
+
+training:
+  resume_checkpoint: runs/cnn21d_signal_p24_l5/dual_checkpoint_balanced/full/best_classification_model.pt
+  batch_size: 16
+  num_workers: 0
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  classification_checkpoint_monitor: auprc
+  regression_checkpoint_monitor: balanced_theta_mae_mrad
+  early_stopping_patience: 6
+  early_stopping_min_delta: 0.00001
+  # Poisson is a veto, not the dominant background class.
+  train_sample_type_fractions: {0: 0.10, 1: 0.40, 2: 0.50}
+  regression_balance:
+    enabled: true
+    theta_bin_edges_mrad: [0, 5, 10, 20, 50, 100, 200]
+    minimum_weight: 0.5
+    maximum_weight: 3.0
+
+evaluation:
+  threshold: 0.5
+
+subsets:
+  tiny: {train: 32, validation: 32, test: 32, epochs: 120, learning_rate: 0.003}
+  pilot: {train: 1000, validation: 300, test: 300, epochs: 24}
+  intermediate: {train: 4000, validation: null, test: null, epochs: 35}
+  full: {train: null, validation: null, test: null, epochs: 100}
+

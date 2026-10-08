@@ -1,0 +1,51 @@
+{
+  "truth_txt": "/Users/fabioali/cernbox/shift/nue_Euniform_FLUKA/nue_int_10k.txt",
+  "root_template": "/eos/PATH/b000021.0.0.{event_plus_one}.trk.root",
+  "selection": {
+    "name": "training",
+    "strict_cuts": {
+      "energy_gev": "> 80",
+      "crop_plate": "truth_plate - 3 < 40",
+      "theta_mrad": "> 5 using hypot(lt_corrected_x, lt_corrected_y)",
+      "theta_max_mrad": null,
+      "slope_correction": "lt_corrected = lt_raw * 1315 / 1350"
+    },
+    "input_truth_events": 10000,
+    "rejection_counts_nonexclusive": {
+      "crop_plate_not_lt_40": 2999,
+      "theta_not_gt_5_mrad": 1177,
+      "energy_not_gt_80_gev": 1446
+    }
+  },
+  "shard_size": 2000,
+  "selected_events": 5148,
+  "shards": [
+    {
+      "index": 0,
+      "output": "scan_shards_training_selection_dry_run/signal_scan_0000_evt000002-003873.h5",
+      "event_first": 2,
+      "event_last": 3873,
+      "event_count": 2000,
+      "status": "dry_run",
+      "first_root": "/eos/PATH/b000021.0.0.3.trk.root"
+    },
+    {
+      "index": 1,
+      "output": "scan_shards_training_selection_dry_run/signal_scan_0001_evt003875-007740.h5",
+      "event_first": 3875,
+      "event_last": 7740,
+      "event_count": 2000,
+      "status": "dry_run",
+      "first_root": "/eos/PATH/b000021.0.0.3876.trk.root"
+    },
+    {
+      "index": 2,
+      "output": "scan_shards_training_selection_dry_run/signal_scan_0002_evt007742-009998.h5",
+      "event_first": 7742,
+      "event_last": 9998,
+      "event_count": 1148,
+      "status": "dry_run",
+      "first_root": "/eos/PATH/b000021.0.0.7743.trk.root"
+    }
+  ]
+}

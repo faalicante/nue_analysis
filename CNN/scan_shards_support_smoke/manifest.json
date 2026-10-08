@@ -1,0 +1,35 @@
+{
+  "truth_txt": "/Users/fabioali/cernbox/shift/nue_Euniform_FLUKA/nue_int_10k.txt",
+  "root_template": "/Users/fabioali/cernbox/shift/nue_Euniform_FLUKA/b000021.0.0.{event_plus_one}.trk.root",
+  "selection": {
+    "name": "training",
+    "strict_cuts": {
+      "energy_gev": "> 80",
+      "crop_plate": "truth_plate - 3 < 40",
+      "theta_mrad": "> 5 using hypot(lt_corrected_x, lt_corrected_y)",
+      "theta_max_mrad": null,
+      "slope_correction": "lt_corrected = lt_raw * 1315 / 1350"
+    },
+    "input_truth_events": 10000,
+    "rejection_counts_nonexclusive": {
+      "crop_plate_not_lt_40": 2999,
+      "theta_not_gt_5_mrad": 1177,
+      "energy_not_gt_80_gev": 1446
+    }
+  },
+  "shard_size": 1,
+  "selected_events": 1,
+  "shards": [
+    {
+      "index": 0,
+      "output": "scan_shards_support_smoke/signal_scan_0000_evt000025-000025.h5",
+      "event_first": 25,
+      "event_last": 25,
+      "event_count": 1,
+      "requested_event_count": 1,
+      "skipped_insufficient_support": 0,
+      "status": "written",
+      "size_bytes": 1102695
+    }
+  ]
+}

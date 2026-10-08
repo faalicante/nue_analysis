@@ -1,0 +1,43 @@
+{
+  "events": [
+    {
+      "event_id": 25,
+      "source_file": "/Users/fabioali/cernbox/shift/nue_Euniform_FLUKA/b000021.0.0.26.trk.root",
+      "source_shape_xyz": [
+        599,
+        599,
+        60
+      ],
+      "volume_shape_zyx": [
+        57,
+        200,
+        200
+      ],
+      "volume_sum": 8421110,
+      "background_mu_per_layer": 3.4210526315789473,
+      "vertex_root_bins": [
+        300,
+        300
+      ],
+      "source_axis_center_xy_um": [
+        242024.6015625,
+        72013.91796875
+      ],
+      "vertex_offset_from_axis_center_xy_um": [
+        0.03843750001396984,
+        -0.07796875000349246
+      ],
+      "propagated_center_xy_um": [
+        242388.106,
+        71993.58899999999
+      ],
+      "propagated_center_xy_bin": [
+        107.25802863876532,
+        99.5940922320981
+      ],
+      "reference_crop": null
+    }
+  ],
+  "output": "scan_shards_smoke/signal_scan_0000_evt000025-000025.h5",
+  "size_bytes": 1102695
+}

@@ -1,0 +1,17 @@
+{
+  "truth_txt": "/Users/fabioali/cernbox/shift/nue_Euniform_FLUKA/nue_int_10k.txt",
+  "root_template": "/Users/fabioali/cernbox/shift/nue_Euniform_FLUKA/b000021.0.0.{event_plus_one}.trk.root",
+  "shard_size": 100,
+  "selected_events": 1,
+  "shards": [
+    {
+      "index": 0,
+      "output": "scan_shards_smoke/signal_scan_0000_evt000025-000025.h5",
+      "event_first": 25,
+      "event_last": 25,
+      "event_count": 1,
+      "status": "written",
+      "size_bytes": 1102695
+    }
+  ]
+}
