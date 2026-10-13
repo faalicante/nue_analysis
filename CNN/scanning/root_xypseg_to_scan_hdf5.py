@@ -116,19 +116,23 @@ def validate_root_volume_support(
     root_path: str,
     truth: SignalTruth,
     size: int = DEFAULT_VOLUME_SIZE,
+    *,
+    require_background_mu: bool = False,
 ) -> None:
-    """Read only TH3 axes and verify that a vertex-centred volume fits."""
+    """Verify vertex-centred support and, optionally, the background estimate."""
     with uproot.open(root_path) as root_file:
         histogram = root_file["XYPseg"]
         x_edges = np.asarray(histogram.axes[0].edges(), dtype=np.float64)
         y_edges = np.asarray(histogram.axes[1].edges(), dtype=np.float64)
-    try:
-        crop_bounds(x_edges, truth.xpos_um, size)
-        crop_bounds(y_edges, truth.ypos_um, size)
-    except ValueError as error:
-        raise CropSupportError(
-            f"event {truth.event_id} ({root_path}): {error}"
-        ) from error
+        try:
+            crop_bounds(x_edges, truth.xpos_um, size)
+            crop_bounds(y_edges, truth.ypos_um, size)
+        except ValueError as error:
+            raise CropSupportError(
+                f"event {truth.event_id} ({root_path}): {error}"
+            ) from error
+        if require_background_mu:
+            poisson_background_per_layer(root_file["XYseg"].values(flow=False))
 
 
 def extract_volume(

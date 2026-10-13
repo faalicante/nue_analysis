@@ -184,15 +184,29 @@ def main() -> None:
         }
         if output.exists() and not args.overwrite:
             row["status"] = "skipped_existing"
+            report_path = output.with_suffix(".report.json")
+            if report_path.exists():
+                previous_report = json.loads(report_path.read_text(encoding="utf-8"))
+                row["requested_event_count"] = len(event_ids)
+                row["event_count"] = len(previous_report.get("events", []))
+                row["skipped_insufficient_support"] = len(
+                    previous_report.get("skipped_insufficient_support", [])
+                )
+                row["skipped_invalid_background_mu"] = len(
+                    previous_report.get("skipped_invalid_background_mu", [])
+                )
         elif args.dry_run:
             row["status"] = "dry_run"
             row["first_root"] = root_paths[0]
         else:
             usable_paths: list[str] = []
             skipped_support: list[dict[str, object]] = []
+            skipped_background: list[dict[str, object]] = []
             for event_id, root_path in zip(event_ids, root_paths):
                 try:
-                    validate_root_volume_support(root_path, truth[event_id])
+                    validate_root_volume_support(
+                        root_path, truth[event_id], require_background_mu=True
+                    )
                 except CropSupportError as error:
                     skipped_support.append({
                         "event_id": event_id,
@@ -204,10 +218,22 @@ def main() -> None:
                         "event_id": event_id,
                         "reason": str(error),
                     }), flush=True)
+                except (KeyError, ValueError) as error:
+                    skipped_background.append({
+                        "event_id": event_id,
+                        "source_file": root_path,
+                        "reason": str(error),
+                    })
+                    print(json.dumps({
+                        "status": "skipped_invalid_background_mu",
+                        "event_id": event_id,
+                        "reason": str(error),
+                    }), flush=True)
                 else:
                     usable_paths.append(root_path)
             row["requested_event_count"] = len(event_ids)
             row["skipped_insufficient_support"] = len(skipped_support)
+            row["skipped_invalid_background_mu"] = len(skipped_background)
             if not usable_paths:
                 row["event_count"] = 0
                 row["status"] = "skipped_no_usable_events"
@@ -224,6 +250,7 @@ def main() -> None:
             report["output"] = str(output)
             report["size_bytes"] = output.stat().st_size
             report["skipped_insufficient_support"] = skipped_support
+            report["skipped_invalid_background_mu"] = skipped_background
             output.with_suffix(".report.json").write_text(
                 json.dumps(report, indent=2) + "\n", encoding="utf-8"
             )
